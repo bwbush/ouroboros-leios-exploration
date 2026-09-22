@@ -4,6 +4,45 @@ Reverse-chronological log. Newest date sections first; newest entries first with
 
 ## 2026-09-22
 
+### The Tidbyt app moved to its own repository ⏳🤖
+
+Brian published it as [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi) — created and pushed 15:58 today, public, Starlark — and removed `musashi/tidbyt/` from this tree. The right home: it is a deployment artifact with its own release cadence, not a research record, and keeping a copy here would have guaranteed drift.
+
+Repointed the four references that would otherwise have dangled: the README's question-table row (a broken relative link the moment the directory left), the README layout bullet, the AGENTS blueprint entry — which now says changes belong upstream, not here — and the root flake's comment explaining why pixlet is absent from the research shell. Added a dated correction callout to this morning's flake entry rather than editing it, per the journal convention.
+
+The published tree matches what was built here, file for file. Two things noticed in passing and left to Brian: the new repository has **no LICENSE**, where the `tidbyte-claude` template it derives from carries one; and `musashi/keys.tar.asc` — an encrypted archive of the pool credentials — sits outside the `keys/` path that `.gitignore` covers, so it is committable as things stand.
+
+### Gave the Tidbyt app its own flake ⏳🤖
+
+The app is on the device and reading well, and Brian asked for the template's flake too — it carries `yq`, which our research shell does not and which `deploy.sh` needs. So `musashi/tidbyt/` is now a flake of its own, adapted from `functionally/tidbyte-claude`: Linux-only systems, the container and its config environment variable renamed, pixlet gaining an install check on its reported version, and the shell banner pointing at this app's scripts. Locked against today's nixpkgs; `packages.pixlet`, `packages.container`, and `devShells.default` all evaluate, the container with `--impure` as designed, since the flake reads `config.yaml` from the environment at build time.
+
+**Removed pixlet from the root flake in the same move**, along with `nix/pixlet.nix`. Two flakes each pinning a version and two hashes is a drift waiting to happen, and the app now owns its toolchain; the root shell went back to exactly the derivation it had before I added pixlet an hour ago (`6swl9wai…`, unchanged), which is the check that the removal was clean. Also brought over the container and pod spec from the template so the always-on push has the same shape as Brian's other daemon.
+
+One safety note recorded in the app's README rather than left implicit: `build-container.sh` bakes `config.yaml` into the image, so **the image holds a Tidbyt credential** and must stay local. `config.yaml` and `out.webp` are gitignored, verified with `git check-ignore` now that both exist on disk.
+
+> [!WARNING]
+> Superseded the same day: the app moved out of this repository to
+> [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi),
+> so `musashi/tidbyt/` no longer exists here. The flake, scripts, and app went
+> with it unchanged.
+
+### Built a Tidbyt app for musashi and the pool ⏳🤖
+
+Brian asked for a 64×32 status display, modelled on his `functionally/tidbyte-claude`, and asked for the layout to be proposed first. Proposed three; he picked the two-frame rotation, and it is now in `musashi/tidbyt/`: network frame (certified share of announced EBs as the tile, then epoch, tip age, tps, average EB size, committee-key coverage) alternating with a pool frame (ticker over a status word, then activation epoch, stake share, seat, blocks, certificates signed).
+
+**The data question answered itself once asked properly.** Blockfrost does not serve musashi — only `cardano-mainnet`, `cardano-preprod`, and `cardano-preview` resolve as hosts — but kleioscan turns out to expose a plain public REST API behind its SPA (`const API = '/api'` in its own bundle), and reading the bundle produced the endpoint list: `/networks`, `/musashi/leios/{summary,throughput}`, `/musashi/pools/{bls-summary,<id>}`, `/musashi/blocks?limit=1`. The pool endpoint alone carries 35 fields, including `committee_seat`, `bls_status`, and `stake_pct` — everything frame B needs.
+
+**It renders, and I looked at it.** pixlet is not in nixpkgs, so a derivation prebuilds it from upstream's release tarball — the same pattern as the node derivation, with both Linux hashes verified by download (they agree with tidbyte-claude's, which is where the derivation's shape came from). Running that binary against live data caught two things a reading could not: Pixlet's JSON decoder returns numbers as **floats**, so `str(epoch)` rendered `62.0` and block counts `0.0`; and the committee-key row overflowed the 38 px column at ten characters. Both fixed, then re-rendered and inspected as upscaled PNGs.
+
+**One judgement worth recording.** The first version painted "146/147 keys active" amber, because one pool lacked an active key — and that pool was ours, registered an hour earlier with its key effective next epoch. A display that cries fault at its owner's expected state is worse than no display, so `upcoming` now reads blue as pending rather than amber as missing.
+
+Two observations fell out of the data and belong in the record rather than the app: musashi's **certified share of announced EBs is 41%** (8,673 of 21,132, so a 59% skip rate) against the ~51% our 14-slot-gap model predicts — a real discrepancy to chase — and kleioscan's `max_block_txs` of **2,777** is exactly the reference-count ceiling we derived from `maxEbTxCount(100,000)`, which is a pleasing independent confirmation of that arithmetic.
+
+> [!WARNING]
+> Superseded the same day: the app now lives at
+> [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi)
+> and `musashi/tidbyt/` no longer exists in this repository.
+
 ### Brought the musashi documentation up to date ⏳🤖
 
 A day of incremental edits left the `musashi/` docs describing a node that no longer exists, so I swept them. The two that mattered:
@@ -89,6 +128,35 @@ The dev shell now carries the prototype binaries: [`nix/cardano-node-leios.nix`]
 Verified as far as this sandbox allows. The x86_64-linux tarball was downloaded, checked against upstream's checksum (`b70902e2…`, matches), unpacked (`bin/` holds the four binaries), and run — `cardano-cli 11.2.2.0`, rev `afa091b4`, the w36 build. Nix cannot *build* here (fixed-output derivations want to write into a read-only `/nix/store`), but it can evaluate with an alternate store root, and it does: `packages.x86_64-linux.cardano-cli.drvPath` resolves, the src URL evaluates to the right asset, `meta.platforms` lists the three systems upstream publishes, and `devShells.x86_64-linux.default` still evaluates with the package appended. `x86_64-darwin` fails to evaluate on `arrow-cpp` being marked broken — **pre-existing**, confirmed by evaluating `HEAD`'s flake unchanged, and the reason the shell adds these binaries only on systems that have an asset.
 
 ## 2026-09-21
+
+### Scope brainstorm with Sebastian Nagel and William Wolff: four horizons, nothing selected yet 👱🤖
+
+Brian, Will Wolff, and Sebastian Nagel met to brainstorm what Brian and Will could focus on. What came out is a menu organized by time horizon, not a decision: nothing was chosen, sized, or ranked. The synopsis is Brian's, reorganized here.
+
+**Short term — analysis and simulation in support of the upcoming release(s) of the Leios node.** The framing is a contribution to the *high-confidence* workstream, with **evidence creation** as the deliverable:
+
+- how plausible different severities of mempool (memory pool) fragmentation are — in particular whether the distribution has a long tail;
+- mitigation of mempool attacks;
+- more detailed mempool-fragmentation simulations;
+- the economics, and the game theory, of attacks;
+- whether the protocol is plausible given its current protocol parameters;
+- the Plutus budget.
+
+**Middle term — R&D that may need addressing after the release, i.e. beyond the MVP (minimum viable product).** Enlarged Plutus limits; archival nodes; incentives, especially incentives to opt into Leios and to rotate keys.
+
+**Long term — R&D.** Partial Leios; full Leios; Leios for data availability.
+
+**Cross-cutting.** Groundwork for marketable future work packages.
+
+**Two cost constraints came up, and they bear on the short-term list directly.** Large-scale telemetry is hard to do on a low budget, and large mempool experiments are expensive — so the near-term evidence has to be designed around what can actually be afforded, rather than scoped first and costed later.
+
+**A loose consensus formed on a hierarchy of plausible attacks: mempool attacks are dominated by more effective attacks that use fewer resources.** If that holds up, it qualifies the short-term list it sits beside — spending the near term on mempool-attack mitigation is harder to justify when the same adversary has cheaper, stronger options available. Worth noting the tension rather than resolving it here: nobody worked the hierarchy out in detail, and "dominated" was a shared impression, not a result. Making it a result — naming the dominating attacks and their resource costs — looks like a cheap and high-leverage piece of evidence in its own right, and one that would tell the rest of the short-term list where to aim.
+
+**Next steps agreed.** Will and Brian meet later this week; all three regroup next week.
+
+Three observations, mine rather than the meeting's. The short-term list is largely **mempool fragmentation and attacks on it**, which is exactly what [ARC-operating-model #83](https://github.com/input-output-hk/ARC-operating-model/issues/83) is titled — so the gap I flagged on 2026-09-18 between that stream title and the breadth of the exploration so far now reads less like a mismatch than like the near-term focus stated plainly, with the wider material parked in the middle and long horizons — though the attack-hierarchy point above pulls the other way, and the two have to be squared before the near term is settled. Several near-term items also land on candidate workstreams already on the list: the fragmentation-under-adversary study covers severity distributions and attack mitigation directly, and the measured-π₁ → p_eb → P_certified pipeline is one instrument for "is the protocol plausible at its current parameters". And the middle-term interest in **incentives for key rotation** has a concrete hook in what the block-producer work turned up the same day: renewing a pool's BLS (Boneh–Lynn–Shacham) voting key means *re-registering the pool*, because the key rides on the pool certificate rather than on a reissuable certificate of its own — a rotation cost that any incentive design has to price.
+
+This meeting was the gate on the Phase-0 scope statement, so that gate is now open: the statement can be drafted — choosing among these, sizing and ranking them — whenever Brian wants it. Nothing here commits to that.
 
 ### Generated the SPO credentials, and matched the docs to the stated threat model ⏳🤖
 

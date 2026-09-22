@@ -25,6 +25,10 @@
         # Upstream publishes a release asset for both systems above, so this
         # needs no per-system guard.
         cardano-node-leios = pkgs.callPackage ./nix/cardano-node-leios.nix { };
+        # pixlet is deliberately NOT here. The Tidbyt app that needs it lives in
+        # its own repository — functionally/tidbyt-musashi — with its own flake
+        # carrying pixlet, yq, and the rest of that toolchain, so the pinned
+        # version lives in exactly one place rather than drifting between two.
         rootBuildInputs = with pkgs; [
             nodejs
             (python3.withPackages (ps: with ps; [

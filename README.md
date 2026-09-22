@@ -16,6 +16,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 | Where is the production Leios code staged, and on which branches? | [Leios production staging branches](./artifacts/cardano-node-status.md) |
 | How does a transaction actually move through the prototype node? | [Transaction-lifecycle diagram](./artifacts/leios-node-tx-lifecycle.svg), backed by [the mempool and LeiosTxCache map](./artifacts/leios-node-mempool-txcache.md) |
 | Which parameters and inequalities decide whether blocks, votes, and certificates are created and accepted — and which are actually enforced? | [Protocol parameters and admission inequalities](./artifacts/leios-node-protocol-parameters.md), with the [timing-inequalities timeline](./artifacts/leios-timing-inequalities.svg) |
+| How is the testnet and our pool doing, at a glance? | [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi) — a 64×32 Tidbyt app over kleioscan's API, developed here and now maintained in its own repository |
 | How do I turn the relay into a block producer, with a Leios voting key? | [musashi/block-producer.md](./musashi/block-producer.md) — keys, certificates, deposits, rotations |
 | How do I collect data on transaction flow — push, pull, mempool, cache — from a running node? | [Collecting transaction-flow data](./artifacts/leios-tx-flow-instrumentation.md) — namespace map, config patch, jq recipes |
 | What tools exist for working with a running Leios node — CLI, load generators, local devnets, offline analysis? | [Tooling for a running Leios node](./artifacts/leios-node-tooling.md) — verified by running the image's own binaries |
@@ -31,7 +32,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 - `AGENTS.md` — the charter: mission, goals, constraints, repository blueprint, conventions, and analysis instructions. Read before contributing.
 - `CLAUDE.md` — Claude-specific addenda; defers to `AGENTS.md`.
 - `artifacts/` — synthesis documents, source maps, and diagrams (the table above).
-- `musashi/` — the live node on the musashi testnet: two `podman kube` pod specs (relay and block producer), a config-pinning script, credential and registration scripts, the pool's published metadata, and two guides. Since 2026-09-22 this runs a registered block producer, pool **ΘΕΛΩ** (`THELO`). Its `config/`, `data/`, and `keys/` are gitignored.
+- `musashi/` — the live node on the musashi testnet: two `podman kube` pod specs (relay and block producer), a config-pinning script, credential and registration scripts, the pool's published metadata, and two guides. Since 2026-09-22 this runs a registered block producer, pool **ΘΕΛΩ** (`THELO`). Its `config/`, `data/`, and `keys/` are gitignored. The Tidbyt status display that watches it was built here and now lives at [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi).
 - `journal/` — dated work log, newest first. A historical record: existing text is not edited.
 - `facts.md` — verified findings, each with its date, source, and layer.
 - `meta-lessons-learned.md` — append-only log of methodology and process lessons.
