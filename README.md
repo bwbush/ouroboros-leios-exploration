@@ -36,7 +36,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 - `facts.md` — verified findings, each with its date, source, and layer.
 - `meta-lessons-learned.md` — append-only log of methodology and process lessons.
 - `.claude/skills/` — agent skills ported from a sibling consensus study and retargeted here.
-- `flake.nix` / `flake.lock` — the Nix development shell, **inherited from that sibling study and not yet pruned** for Leios.
+- `flake.nix` / `flake.lock` / `nix/` — the Nix development shell, **inherited from that sibling study and not yet pruned** for Leios. Its one Leios-specific addition is `nix/cardano-node-leios.nix`, which puts the prototype `cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on `PATH` from a pinned upstream release tarball.
 
 Directories named in the blueprint but not yet created — `experiments/`, `assessments/`, `weekly-reports/` — are absent because nothing in Phase 0 has needed them yet.
 

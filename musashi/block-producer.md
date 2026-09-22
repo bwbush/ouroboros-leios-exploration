@@ -57,8 +57,9 @@ export CARDANO_NODE_NETWORK_ID=164     # or pass --testnet-magic 164
 
 Two scripts do the mechanical parts. Both find `cardano-cli` in
 `$CARDANO_CLI`, then `./build` (searched recursively, for a local build), then
-`PATH`; both read the network magic and KES period length from the pinned
-`config/`, so nothing is hard-coded.
+`PATH` — so inside `nix develop` they need no configuration at all, the dev
+shell having provided the pinned binaries. Both read the network magic and KES
+period length from the pinned `config/`, so nothing is hard-coded.
 
 ```shell
 ./make-spo-keys.sh                 # all five key pairs + addresses + op-cert

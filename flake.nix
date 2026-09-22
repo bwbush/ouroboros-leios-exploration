@@ -7,12 +7,24 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+    # Linux only: this effort does not support darwin, and x86_64-darwin could
+    # not evaluate anyway (nixpkgs marks arrow-cpp, pulled in by the R and
+    # Python stacks below, broken there).
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;
           config = { allowUnfree = true; };
         };
+        # Leios-prototype cardano-node, cardano-cli, tx-firehose and
+        # mempool-monitor, from an upstream release tarball rather than built
+        # from source (see nix/cardano-node-leios.nix for why, and for how to
+        # bump the pinned week). Needed by musashi/: the `dijkstra` CLI era
+        # group for BLS key generation and pool registration, and the two
+        # mempool tools for the fragmentation instrumentation.
+        # Upstream publishes a release asset for both systems above, so this
+        # needs no per-system guard.
+        cardano-node-leios = pkgs.callPackage ./nix/cardano-node-leios.nix { };
         rootBuildInputs = with pkgs; [
             nodejs
             (python3.withPackages (ps: with ps; [
@@ -216,9 +228,27 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = rootBuildInputs;
+          buildInputs = rootBuildInputs ++ [ cardano-node-leios ];
           shellHook = rootShellHook;
         };
+
+        # `nix build .#cardano-cli` / `nix run .#cardano-cli -- dijkstra query tip`.
+        # The single-binary attributes are symlink views of the one tarball, so
+        # asking for any of them fetches it once.
+        packages =
+          {
+            inherit cardano-node-leios;
+            default = cardano-node-leios;
+          }
+          // pkgs.lib.genAttrs
+            [ "cardano-cli" "cardano-node" "tx-firehose" "mempool-monitor" ]
+            (
+              exe:
+              pkgs.runCommand exe { meta = cardano-node-leios.meta // { mainProgram = exe; }; } ''
+                mkdir -p $out/bin
+                ln -s ${cardano-node-leios}/bin/${exe} $out/bin/${exe}
+              ''
+            );
       }
     );
 }

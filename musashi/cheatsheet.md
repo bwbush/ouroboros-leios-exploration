@@ -149,10 +149,16 @@ and [the timing-inequalities timeline](../artifacts/leios-timing-inequalities.sv
 
 ## Building the CLI yourself
 
-The image's `cardano-cli` is statically linked, so `podman cp
-musashi-relay-node:/usr/local/bin/cardano-cli .` is the quick way to get one.
-To build it instead, from the release tag whose `flake.lock` pins the same
-`cardano-node` rev the image reports:
+**The repository's dev shell now provides it.** `nix develop` at the repo root
+puts `cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on
+`PATH`, from the pinned `prototype-2026w36` release tarball
+([`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix)); `nix build
+.#cardano-cli` gets just the CLI. Bump the week there when the network rolls.
+
+Two alternatives: the image's `cardano-cli` is statically linked, so `podman cp
+musashi-relay-node:/usr/local/bin/cardano-cli .` is the quick way to get one;
+or build from upstream's flake, at the release tag whose `flake.lock` pins the
+same `cardano-node` rev the image reports:
 
 ```shell
 nix build github:input-output-hk/ouroboros-leios/prototype-2026w36#cardano-cli-static

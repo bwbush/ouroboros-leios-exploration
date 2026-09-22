@@ -2,6 +2,22 @@
 
 Reverse-chronological log. Newest date sections first; newest entries first within a date. See [AGENTS.md](../AGENTS.md) § Repository Blueprint for the format rules.
 
+## 2026-09-22
+
+### Dropped darwin from the flake ⏳🤖
+
+Brian confirmed the new shell works and that this effort does not need darwin, so both nix files are Linux-only now: [`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix) keeps the x86_64-linux and aarch64-linux release assets (with a note that upstream publishes an aarch64-darwin tarball if that ever changes), and the flake switched from `eachDefaultSystem` to `eachSystem [ "x86_64-linux" "aarch64-linux" ]`. Two simplifications fell out: the `dontFixup` rationale no longer has to explain darwin's `@executable_path` dylib layout, and the per-system guard on the shell's build inputs is gone, since both remaining systems have an asset. The flake comment records why darwin is absent, including that x86_64-darwin could not evaluate anyway — nixpkgs marks `arrow-cpp`, which the R and Python stacks pull in, broken there.
+
+Re-verified: statix clean, `devShells` now enumerates exactly the two Linux systems, `meta.platforms` matches, and the x86_64-linux `cardano-cli` derivation path is **unchanged** (`bl50z3kc…`), which is the evidence that dropping darwin touched nothing about the build we actually use.
+
+### Added a cardano-cli derivation to the flake ⏳🤖
+
+The dev shell now carries the prototype binaries: [`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix) puts `cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on `PATH` under `nix develop`, with `nix build .#cardano-cli` (and `.#tx-firehose`, and so on) as symlink views of the one tarball.
+
+**Prebuilt, not built from source, and that is the design decision worth recording.** Adding `ouroboros-leios` as a flake input would drag a haskell.nix closure into a lock file that has four nodes; the upstream release assets are statically linked musl binaries, so there is nothing to compile and nothing for patchelf to do. The derivation is a `fetchurl` of `cardano-node-leios-<system>.tar.gz` with `dontFixup`, an install phase that copies `bin/` wholesale (which keeps the darwin dylibs beside their executables, where `@executable_path` expects them), and an `installCheckPhase` that runs `cardano-cli --version` and greps for the pinned `rev` — so a tarball that is not the build we think it is fails rather than reaching someone's `PATH`. Hashes come from upstream's published `.sha256` files converted to SRI; the file carries the bump recipe, and a comment saying the pinned week must track the network's `MinNodeVersion`.
+
+Verified as far as this sandbox allows. The x86_64-linux tarball was downloaded, checked against upstream's checksum (`b70902e2…`, matches), unpacked (`bin/` holds the four binaries), and run — `cardano-cli 11.2.2.0`, rev `afa091b4`, the w36 build. Nix cannot *build* here (fixed-output derivations want to write into a read-only `/nix/store`), but it can evaluate with an alternate store root, and it does: `packages.x86_64-linux.cardano-cli.drvPath` resolves, the src URL evaluates to the right asset, `meta.platforms` lists the three systems upstream publishes, and `devShells.x86_64-linux.default` still evaluates with the package appended. `x86_64-darwin` fails to evaluate on `arrow-cpp` being marked broken — **pre-existing**, confirmed by evaluating `HEAD`'s flake unchanged, and the reason the shell adds these binaries only on systems that have an asset.
+
 ## 2026-09-21
 
 ### Generated the SPO credentials, and matched the docs to the stated threat model ⏳🤖

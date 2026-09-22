@@ -41,8 +41,17 @@ Being static, they are also useful *outside* the container: copy them out
 (`podman cp musashi-relay-node:/usr/local/bin/cardano-cli .`) and they run on
 any x86-64 Linux host.
 
-To build the same CLI rather than copy it, `ouroboros-leios` exposes it as a
-flake package — build from the **release tag**, whose `flake.lock` pins
+**This repository's dev shell now carries them**, from the same release
+tarball: [`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix) puts
+`cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on `PATH`
+under `nix develop`, and `nix build .#cardano-cli` builds just the CLI. It is a
+`fetchurl` of upstream's published asset rather than a source build, so it adds
+no flake inputs. **x86_64-linux and aarch64-linux only** — this effort does not
+support darwin, so the flake enumerates just those two systems even though
+upstream also publishes an aarch64-darwin tarball.
+
+To build from upstream's own flake instead, `ouroboros-leios` exposes the CLI as
+a flake package — build from the **release tag**, whose `flake.lock` pins
 `cardano-node-leios` to the same rev that week's image reports:
 
 ```shell
