@@ -1,0 +1,6 @@
+# Rolling network configuration — re-pin with ./pin-config.sh, never commit.
+config/
+# Chain DB, Leios SQLite stores, socket, logs.
+data/
+# Block-producer credentials, if this ever becomes an SPO node.
+keys/

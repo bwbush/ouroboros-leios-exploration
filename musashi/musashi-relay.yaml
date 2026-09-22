@@ -1,0 +1,93 @@
+# Podman kube spec: one non-block-producing Leios relay on the musashi
+# testnet (network magic 164).
+#
+#   ./pin-config.sh                        # fetch the live network config
+#   podman kube play musashi-relay.yaml    # run from this directory
+#   podman kube down musashi-relay.yaml    # stop and remove the pod
+#
+# See cheatsheet.md. Verified against podman 5.4.1 semantics on 2026-09-21;
+# not smoke-tested end to end (see the cheatsheet's Status note).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: musashi-relay
+  labels:
+    app: musashi-relay
+spec:
+  # Restart the node if it crashes; `podman kube down` still stops it.
+  restartPolicy: always
+  containers:
+    - name: node
+      # Weekly release tag, digest-pinned so a re-tag cannot change what runs.
+      #
+      # MATCH THE WEEK TO THE NETWORK, NOT TO MAIN. The live config names
+      # MinNodeVersion 11.1.0.164-prototype-2026w36 and the chain that has
+      # been running since 2026-09-07 was deployed from the w36 build
+      # (node rev afa091b4, image built 2026-09-07). MinNodeVersion is only a
+      # floor, so a newer image starts happily and then diverges: w38 carries
+      # a newer cardano-ledger (daa38fec vs 1587f21a) and rejects a block the
+      # network accepted, as a phase-2 (Plutus) validation mismatch. See
+      # cheatsheet.md, "the node stops advancing and churns peers".
+      #
+      # w38, for when the network rolls forward:
+      #   prototype-2026w38@sha256:f515269771b923e2fc66c04c77df6e0b6779e1ccf8b1a5285c23d837c2ea7384
+      image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w36@sha256:0df972de2193f9299af4df409fde2b7ea56188ddfe2c3b77aa661e23b226a566
+      # The image's CMD is /app/run-node.sh: it copies /app/config into /data,
+      # then runs `cardano-node run` there. Everything below only adjusts the
+      # environment that script reads.
+      env:
+        - name: WORKING_DIR
+          value: /data
+        - name: SOURCE_DIR
+          value: /app
+        - name: HOST_ADDR
+          value: 0.0.0.0
+        - name: PORT
+          value: "3010"
+        # For `podman exec ... cardano-cli query ...` inside the container.
+        - name: CARDANO_NODE_SOCKET_PATH
+          value: /data/node.socket
+        - name: CARDANO_NODE_NETWORK_ID
+          value: "164"
+      ports:
+        # Node-to-node. Inbound is not required to sync, but publishing it
+        # lets peers dial back and is what a relay is for.
+        - name: n2n
+          containerPort: 3010
+          hostPort: 3010
+        # Prometheus. Only reachable if ./pin-config.sh rebound the backend
+        # from 127.0.0.1 to 0.0.0.0 (its default; EXPOSE_METRICS=0 disables).
+        - name: metrics
+          containerPort: 12798
+          hostPort: 12798
+      volumeMounts:
+        # Freshly pinned network config, mounted over the image's stale baked
+        # copy. Without this the node follows the wrong chain instance.
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        # Chain DB, LeiosDb, node.socket, node.log.
+        - name: data
+          mountPath: /data
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+  volumes:
+    - name: config
+      hostPath:
+        path: ./config
+        type: Directory
+    - name: data
+      hostPath:
+        path: /data/musashi
+        type: DirectoryOrCreate
+
+# ---------------------------------------------------------------------------
+# Block production: see musashi-bp.yaml — the same pod plus a ./keys volume and
+# an explicit `cardano-node run` with --shelley-{operational-certificate,kes-key,
+# vrf-key,bls-key}, since /app/run-node.sh takes no key flags. The procedure
+# (keys, certificates, deposits, rotations) is in block-producer.md.
+#
+# Both specs pin the same image digest — bump them together.
+# ---------------------------------------------------------------------------

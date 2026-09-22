@@ -2,7 +2,7 @@
 
 Research-and-development exploration of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios), the Cardano throughput-scaling protocol ([CIP-0164](https://github.com/cardano-foundation/CIPs/blob/d07a30bca36a28535afa151915bb4900b2116d3a/CIP-0164/README.md)). This repository is a working notebook, not a deliverable: it holds the survey work, source-level maps, diagrams, verified facts, and process lessons that a scope decision will rest on.
 
-**Provenance:** ⏳🤖 LLM-generated index, pending human review · **Charter and conventions:** [AGENTS.md](./AGENTS.md)
+**Provenance:** ⏳🤖 LLM-generated index, pending human review · **Charter and conventions:** [AGENTS.md](./AGENTS.md) · **Work stream:** [ARC-operating-model #83](https://github.com/input-output-hk/ARC-operating-model/issues/83)
 
 > [!NOTE]
 >
@@ -16,6 +16,10 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 | Where is the production Leios code staged, and on which branches? | [Leios production staging branches](./artifacts/cardano-node-status.md) |
 | How does a transaction actually move through the prototype node? | [Transaction-lifecycle diagram](./artifacts/leios-node-tx-lifecycle.svg), backed by [the mempool and LeiosTxCache map](./artifacts/leios-node-mempool-txcache.md) |
 | Which parameters and inequalities decide whether blocks, votes, and certificates are created and accepted — and which are actually enforced? | [Protocol parameters and admission inequalities](./artifacts/leios-node-protocol-parameters.md), with the [timing-inequalities timeline](./artifacts/leios-timing-inequalities.svg) |
+| How do I turn the relay into a block producer, with a Leios voting key? | [musashi/block-producer.md](./musashi/block-producer.md) — keys, certificates, deposits, rotations |
+| How do I collect data on transaction flow — push, pull, mempool, cache — from a running node? | [Collecting transaction-flow data](./artifacts/leios-tx-flow-instrumentation.md) — namespace map, config patch, jq recipes |
+| What tools exist for working with a running Leios node — CLI, load generators, local devnets, offline analysis? | [Tooling for a running Leios node](./artifacts/leios-node-tooling.md) — verified by running the image's own binaries |
+| How do I run a node on the musashi testnet myself? | [musashi/cheatsheet.md](./musashi/cheatsheet.md) — a podman relay, with the config-pinning trap that stops it syncing |
 | How do the kleioscan chain metrics, the node's telemetry funnel, and the models' alignment quantities line up? | [Mempool-alignment metric mapping](./artifacts/leios-mempool-metrics-mapping.md) |
 | What does a Leios term or parameter mean? | [Leios cheatsheet](./artifacts/leios-cheatsheet.md) — written for a new team member on day one |
 | What have we actually confirmed, with a date and a source? | [facts.md](./facts.md) |
@@ -27,6 +31,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 - `AGENTS.md` — the charter: mission, goals, constraints, repository blueprint, conventions, and analysis instructions. Read before contributing.
 - `CLAUDE.md` — Claude-specific addenda; defers to `AGENTS.md`.
 - `artifacts/` — synthesis documents, source maps, and diagrams (the table above).
+- `musashi/` — a runnable podman setup for a node on the musashi testnet: the pod spec, a config-pinning script, and a cheatsheet. Its `config/`, `data/`, and `keys/` are gitignored.
 - `journal/` — dated work log, newest first. A historical record: existing text is not edited.
 - `facts.md` — verified findings, each with its date, source, and layer.
 - `meta-lessons-learned.md` — append-only log of methodology and process lessons.
@@ -47,4 +52,4 @@ Directories named in the blueprint but not yet created — `experiments/`, `asse
 
 ## Temporary hosting and deliberate absences
 
-The standalone history is temporarily published as the unrelated [`bwbush/tmp-explorations`](https://github.com/input-output-hk/ouroboros-leios/tree/bwbush/tmp-explorations) branch of `ouroboros-leios`; it is not a normal feature branch or pull-request precursor. There is no ticket board. The repository structure itself stays provisional until after the scope decision.
+The standalone history is temporarily published as the unrelated [`bwbush/tmp-explorations`](https://github.com/input-output-hk/ouroboros-leios/tree/bwbush/tmp-explorations) branch of `ouroboros-leios`; it is not a normal feature branch or pull-request precursor. This work falls under [`input-output-hk/ARC-operating-model` #83](https://github.com/input-output-hk/ARC-operating-model/issues/83) (“[CBU] - Leios: mempool fragmentation TBD”, labeled **Stream**, assigned to Brian W. Bush and Will Wolff) — a single stream-level issue on the ARC operating-model board, not a task board: individual findings, artifacts, and workstream candidates are tracked in this repository’s records rather than as tickets. The repository structure itself stays provisional until after the scope decision.

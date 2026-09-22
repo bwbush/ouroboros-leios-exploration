@@ -1,0 +1,83 @@
+# Podman kube spec: the musashi relay, but forging.
+#
+# One node doing both jobs — see block-producer.md § 6 for what that costs.
+# Switch over from the relay (the chain DB is shared, so no resync):
+#
+#   podman kube down musashi-relay.yaml
+#   podman kube play musashi-bp.yaml
+#
+# Needs ./keys populated per block-producer.md §§ 1-2, with `chmod 600 keys/*.skey`.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: musashi-bp
+  labels:
+    app: musashi-bp
+spec:
+  restartPolicy: always
+  containers:
+    - name: node
+      # KEEP THIS DIGEST IN STEP WITH musashi-relay.yaml. w36 is the build the
+      # running chain was deployed from; see cheatsheet.md on version skew.
+      image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w36@sha256:0df972de2193f9299af4df409fde2b7ea56188ddfe2c3b77aa661e23b226a566
+      # /app/run-node.sh takes no key flags, so the producer replaces it. This
+      # repeats what that script does — stage the pinned config into /data and
+      # run there, since config.json names its genesis files relatively — and
+      # adds the four credentials.
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          cp -rf /app/config/. /data/
+          find /data -mindepth 1 -maxdepth 1 -type f -exec chmod u+w {} +
+          cd /data && mkdir -p db
+          exec cardano-node run \
+            --config config.json \
+            --topology topology.json \
+            --database-path db \
+            --socket-path node.socket \
+            --host-addr 0.0.0.0 \
+            --port 3010 \
+            --shelley-operational-certificate /keys/opcert.cert \
+            --shelley-kes-key /keys/kes.skey \
+            --shelley-vrf-key /keys/vrf.skey \
+            --shelley-bls-key /keys/bls.skey
+      env:
+        - name: CARDANO_NODE_SOCKET_PATH
+          value: /data/node.socket
+        - name: CARDANO_NODE_NETWORK_ID
+          value: "164"
+      ports:
+        - name: n2n
+          containerPort: 3010
+          hostPort: 3010
+        - name: metrics
+          containerPort: 12798
+          hostPort: 12798
+      volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: data
+          mountPath: /data
+        - name: keys
+          mountPath: /keys
+          readOnly: true
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+  volumes:
+    - name: config
+      hostPath:
+        path: ./config
+        type: Directory
+    - name: data
+      hostPath:
+        path: ./data
+        type: DirectoryOrCreate
+    - name: keys
+      hostPath:
+        path: ./keys
+        type: Directory
