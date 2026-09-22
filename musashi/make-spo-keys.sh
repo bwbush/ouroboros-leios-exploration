@@ -7,16 +7,18 @@
 # must, since the producer will not start without the certificate.
 #
 # Usage:
-#   ./make-spo-keys.sh            # keys, addresses, and op-cert (if the node is reachable)
+#   ./make-spo-keys.sh            # keys, addresses, and op-cert
 #   ./make-spo-keys.sh keys       # keys and addresses only
-#   ./make-spo-keys.sh opcert     # (re)issue the op-cert from existing keys — also the KES-rotation step
+#   ./make-spo-keys.sh opcert     # (re)issue the op-cert from the existing KES key (for a respun chain)
+#   ./make-spo-keys.sh rotate-kes # generate a new KES key and op-cert, archiving the old set
 #   ./make-spo-keys.sh show       # print the summary again, generating nothing
 #
 # Env:
 #   CARDANO_CLI   path to cardano-cli (else ./build, else PATH, else the pod)
 #   KEYS_DIR      where credentials land (default ./keys)
 #   CONFIG_DIR    pinned network config (default ./config) — read for magic and KES period length
-#   SOCKET        node socket (default ./data/node.socket)
+#   DATA_DIR      host node-data directory (default /data/musashi)
+#   SOCKET        node socket (default DATA_DIR/node.socket)
 #
 # Existing key files are never overwritten — not for secrecy (these are
 # throwaway testnet credentials) but because a new cold key is a new pool, which
@@ -29,7 +31,8 @@ umask 077
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEYS_DIR="${KEYS_DIR:-$HERE/keys}"
 CONFIG_DIR="${CONFIG_DIR:-$HERE/config}"
-SOCKET="${SOCKET:-$HERE/data/node.socket}"
+DATA_DIR="${DATA_DIR:-/data/musashi}"
+SOCKET="${SOCKET:-$DATA_DIR/node.socket}"
 STEP="${1:-all}"
 
 # --- locate cardano-cli -------------------------------------------------------
@@ -117,7 +120,7 @@ summary() {
   if [ -r "$KEYS_DIR/opcert.cert" ]; then
     echo "op-cert:           issued at KES period $(cat "$KEYS_DIR/opcert.kesperiod" 2>/dev/null || echo '?')"
   else
-    echo "op-cert:           NOT ISSUED — run './make-spo-keys.sh opcert' with the node running"
+    echo "op-cert:           NOT ISSUED — run './make-spo-keys.sh opcert'"
   fi
   cat <<EOF
 
@@ -174,11 +177,14 @@ current_slot() {
   if have_node; then
     local tip slot
     tip="$(mktemp)"
-    CARDANO_NODE_SOCKET_PATH="$SOCKET" "$CLI" dijkstra query tip "${NET[@]}" > "$tip"
-    slot="$(json_field "$tip" slot)"
+    if CARDANO_NODE_SOCKET_PATH="$SOCKET" "$CLI" dijkstra query tip "${NET[@]}" > "$tip" 2>/dev/null; then
+      slot="$(json_field "$tip" slot 2>/dev/null || true)"
+    else
+      slot=""
+    fi
     rm -f "$tip"
     case "$slot" in ''|*[!0-9]*) ;; *) echo "$slot"; return ;; esac
-    echo "warning: could not read the tip slot from the node; falling back to the clock" >&2
+    echo "warning: socket $SOCKET exists but query tip failed; falling back to the clock" >&2
   fi
   local start now
   start="$(date -u -d "$SYSTEM_START" +%s 2>/dev/null)" || {
@@ -190,12 +196,12 @@ current_slot() {
 issue_opcert() {
   [ -r "$KEYS_DIR/kes.vkey" ] || { echo "error: no kes.vkey in $KEYS_DIR — run the 'keys' step first" >&2; exit 1; }
   local slot period source
-  if have_node; then source="node"; else source="clock (no socket at $SOCKET)"; fi
+  if have_node; then source="node socket, with clock fallback"; else source="clock (no socket at $SOCKET)"; fi
   slot="$(current_slot)"
   period=$(( slot / KES_PERIOD_SLOTS ))
   echo "slot $slot from $source  =>  KES period $period (valid for $MAX_KES periods)"
-  # Reissuing is legitimate — it is the KES-rotation step — so this one file is
-  # allowed to be replaced, and the counter file advances with it.
+  # Reissuing against the existing KES key is needed after a testnet respin. It
+  # is not a KES-key rotation; use rotate-kes when the key approaches expiry.
   "$CLI" dijkstra node issue-op-cert \
     --kes-verification-key-file "$KEYS_DIR/kes.vkey" \
     --cold-signing-key-file "$KEYS_DIR/cold.skey" \
@@ -207,10 +213,56 @@ issue_opcert() {
   echo "wrote $KEYS_DIR/opcert.cert"
 }
 
+# --- step: rotate KES ----------------------------------------------------------
+# A real KES rotation needs a fresh key pair. Build the complete replacement in
+# a temporary directory, and retain the old key, certificate, period, and cold
+# counter together so an interrupted operator procedure remains diagnosable.
+rotate_kes() {
+  for f in cold.skey cold.counter kes.vkey kes.skey opcert.cert; do
+    [ -r "$KEYS_DIR/$f" ] || { echo "error: $KEYS_DIR/$f missing — cannot rotate KES" >&2; exit 1; }
+  done
+
+  local stamp archive tmp slot period source
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  archive="$KEYS_DIR/kes-archive/$stamp"
+  tmp="$(mktemp -d "$KEYS_DIR/.kes-rotation.XXXXXX")"
+  trap 'rm -rf "$tmp"' RETURN
+
+  if have_node; then source="node socket, with clock fallback"; else source="clock (no socket at $SOCKET)"; fi
+  slot="$(current_slot)"
+  period=$(( slot / KES_PERIOD_SLOTS ))
+
+  mkdir -p "$KEYS_DIR/kes-archive"
+  mkdir "$archive" || { echo "error: KES archive $archive already exists; retry after the timestamp changes" >&2; exit 1; }
+  cp -p "$KEYS_DIR/kes.vkey" "$KEYS_DIR/kes.skey" "$KEYS_DIR/opcert.cert" "$KEYS_DIR/cold.counter" "$archive/"
+  [ ! -e "$KEYS_DIR/opcert.kesperiod" ] || cp -p "$KEYS_DIR/opcert.kesperiod" "$archive/"
+
+  "$CLI" dijkstra node key-gen-KES \
+    --verification-key-file "$tmp/kes.vkey" \
+    --signing-key-file "$tmp/kes.skey"
+  "$CLI" dijkstra node issue-op-cert \
+    --kes-verification-key-file "$tmp/kes.vkey" \
+    --cold-signing-key-file "$KEYS_DIR/cold.skey" \
+    --operational-certificate-issue-counter-file "$KEYS_DIR/cold.counter" \
+    --kes-period "$period" \
+    --out-file "$tmp/opcert.cert"
+  echo "$period" > "$tmp/opcert.kesperiod"
+
+  install -m 644 "$tmp/kes.vkey" "$KEYS_DIR/kes.vkey"
+  install -m 600 "$tmp/kes.skey" "$tmp/opcert.cert" "$tmp/opcert.kesperiod" "$KEYS_DIR/"
+  rm -rf "$tmp"
+  trap - RETURN
+
+  echo "rotated KES key at slot $slot from $source, period $period"
+  echo "archived previous KES material in $archive"
+  echo "restart the block-producer pod so it loads the new key and certificate"
+}
+
 case "$STEP" in
   keys)   gen_keys; summary ;;
   opcert) issue_opcert; summary ;;
+  rotate-kes) rotate_kes; summary ;;
   show)   summary ;;
   all)   gen_keys; issue_opcert; summary ;;
-  *) echo "usage: $0 [all|keys|opcert|show]" >&2; exit 2 ;;
+  *) echo "usage: $0 [all|keys|opcert|rotate-kes|show]" >&2; exit 2 ;;
 esac

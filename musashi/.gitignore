@@ -2,5 +2,7 @@
 config/
 # Chain DB, Leios SQLite stores, socket, logs.
 data/
-# Block-producer credentials, if this ever becomes an SPO node.
+# Captured operational logs kept beside the runbook.
+*.log
+# Block-producer credentials.
 keys/

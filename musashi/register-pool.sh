@@ -21,10 +21,11 @@
 #   PLEDGE                    lovelace, default 0
 #   POOL_COST                 lovelace, default = genesis minPoolCost
 #   MARGIN                    default 0
-#   CARDANO_CLI, KEYS_DIR, CONFIG_DIR, SOCKET   as in make-spo-keys.sh
+#   CARDANO_CLI, KEYS_DIR, CONFIG_DIR, DATA_DIR, SOCKET   as in make-spo-keys.sh
 #
 # What it costs, from the pinned genesis: a 500 ada pool deposit and a 2 ada
-# stake-key deposit, plus fees and whatever pledge you set. Governance can move
+# stake-key deposit, plus fees. A pledge is a stake commitment, not an amount
+# spent by this transaction. Governance can move
 # those; check with `cardano-cli dijkstra query protocol-parameters`.
 
 set -euo pipefail
@@ -33,7 +34,8 @@ umask 077
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEYS_DIR="${KEYS_DIR:-$HERE/keys}"
 CONFIG_DIR="${CONFIG_DIR:-$HERE/config}"
-SOCKET="${SOCKET:-$HERE/data/node.socket}"
+DATA_DIR="${DATA_DIR:-/data/musashi}"
+SOCKET="${SOCKET:-$DATA_DIR/node.socket}"
 WORK="${WORK:-$KEYS_DIR/registration}"
 STEP="${1:-certs}"
 
@@ -184,7 +186,7 @@ EOF
     exit 1
   fi
   echo "input:         $txin ($amount lovelace)"
-  local need=$(( POOL_DEPOSIT + KEY_DEPOSIT + PLEDGE ))
+  local need=$(( POOL_DEPOSIT + KEY_DEPOSIT ))
   if [ "$amount" -lt "$need" ]; then
     echo "error: that UTxO holds $amount lovelace; the deposits alone need $need plus fees" >&2
     exit 1
