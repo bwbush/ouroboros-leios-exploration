@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
 # Generate the credentials for a musashi block producer, and issue the
-# operational certificate. Offline except for the op-cert step, which needs a
-# node socket to read the current slot.
+# operational certificate. Entirely offline: the op-cert's KES period comes from
+# the node when one is reachable and from the wall clock plus the genesis
+# systemStart otherwise, so this works before the producer can start — which it
+# must, since the producer will not start without the certificate.
 #
 # Usage:
 #   ./make-spo-keys.sh            # keys, addresses, and op-cert (if the node is reachable)
@@ -50,8 +52,9 @@ if [ -z "$CLI" ]; then
 error: no cardano-cli found. Either
   - build it into ./build (the script searches ./build recursively),
   - set CARDANO_CLI=/path/to/cardano-cli, or
-  - copy it out of the running pod:
-      podman cp musashi-relay-node:/usr/local/bin/cardano-cli ./build/cardano-cli
+  - enter the repository's dev shell, which provides it: nix develop
+  - or copy it out of the running pod (container name follows the pod):
+      podman cp musashi-bp-node:/usr/local/bin/cardano-cli ./build/cardano-cli
 EOF
   exit 1
 fi
@@ -70,6 +73,8 @@ json_field() {
 MAGIC="$(json_field "$SHELLEY" networkMagic)"
 KES_PERIOD_SLOTS="$(json_field "$SHELLEY" slotsPerKESPeriod)"
 MAX_KES="$(json_field "$SHELLEY" maxKESEvolutions)"
+SYSTEM_START="$(json_field "$SHELLEY" systemStart)"
+SLOT_LENGTH="$(json_field "$SHELLEY" slotLength)"
 NET=(--testnet-magic "$MAGIC")
 
 echo "cardano-cli:  $CLI"
@@ -160,17 +165,35 @@ gen_keys() {
 }
 
 # --- step: op-cert ------------------------------------------------------------
+# The slot the chain is in, from the node when it is running and from the clock
+# otherwise. The clock is authoritative-equivalent here: musashi has one era at
+# one second per slot from genesis (byron startTime == shelley systemStart), so
+# slot = floor((now - systemStart) / slotLength). Verified against a live tip:
+# 2026-09-21T16:28:28Z gives 1268908, which is what the network reported.
+current_slot() {
+  if have_node; then
+    local tip slot
+    tip="$(mktemp)"
+    CARDANO_NODE_SOCKET_PATH="$SOCKET" "$CLI" dijkstra query tip "${NET[@]}" > "$tip"
+    slot="$(json_field "$tip" slot)"
+    rm -f "$tip"
+    case "$slot" in ''|*[!0-9]*) ;; *) echo "$slot"; return ;; esac
+    echo "warning: could not read the tip slot from the node; falling back to the clock" >&2
+  fi
+  local start now
+  start="$(date -u -d "$SYSTEM_START" +%s 2>/dev/null)" || {
+    echo "error: could not parse systemStart '$SYSTEM_START' (GNU date required)" >&2; exit 1; }
+  now="$(date -u +%s)"
+  echo $(( (now - start) / SLOT_LENGTH ))
+}
+
 issue_opcert() {
   [ -r "$KEYS_DIR/kes.vkey" ] || { echo "error: no kes.vkey in $KEYS_DIR — run the 'keys' step first" >&2; exit 1; }
-  have_node || { echo "error: no node socket at $SOCKET (needed for the current slot)" >&2; exit 1; }
-  local slot period tip
-  tip="$(mktemp)"
-  CARDANO_NODE_SOCKET_PATH="$SOCKET" "$CLI" dijkstra query tip "${NET[@]}" > "$tip"
-  slot="$(json_field "$tip" slot)"
-  rm -f "$tip"
-  case "$slot" in ''|*[!0-9]*) echo "error: could not read the tip slot" >&2; exit 1 ;; esac
+  local slot period source
+  if have_node; then source="node"; else source="clock (no socket at $SOCKET)"; fi
+  slot="$(current_slot)"
   period=$(( slot / KES_PERIOD_SLOTS ))
-  echo "tip slot $slot  =>  KES period $period (valid for $MAX_KES periods)"
+  echo "slot $slot from $source  =>  KES period $period (valid for $MAX_KES periods)"
   # Reissuing is legitimate — it is the KES-rotation step — so this one file is
   # allowed to be replaced, and the counter file advances with it.
   "$CLI" dijkstra node issue-op-cert \
@@ -188,11 +211,6 @@ case "$STEP" in
   keys)   gen_keys; summary ;;
   opcert) issue_opcert; summary ;;
   show)   summary ;;
-  all)
-    gen_keys
-    if have_node; then issue_opcert
-    else echo "note: no node socket at $SOCKET — skipping the op-cert; run './make-spo-keys.sh opcert' later"
-    fi
-    summary ;;
+  all)   gen_keys; issue_opcert; summary ;;
   *) echo "usage: $0 [all|keys|opcert|show]" >&2; exit 2 ;;
 esac

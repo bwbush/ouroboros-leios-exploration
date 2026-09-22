@@ -13,6 +13,11 @@
 # Env:
 #   RELAY_HOST / RELAY_IPV4   how peers reach this node — one is required
 #   RELAY_PORT                default 3010
+#   METADATA_URL              published pool-metadata.json (optional; the pool
+#                             has no displayed name without it). The hash is
+#                             computed from METADATA_FILE, default
+#                             ./pool-metadata.json — publish that exact file.
+#   METADATA_FILE             default ./pool-metadata.json
 #   PLEDGE                    lovelace, default 0
 #   POOL_COST                 lovelace, default = genesis minPoolCost
 #   MARGIN                    default 0
@@ -70,6 +75,7 @@ PLEDGE="${PLEDGE:-0}"
 POOL_COST="${POOL_COST:-$MIN_POOL_COST}"
 MARGIN="${MARGIN:-0}"
 RELAY_PORT="${RELAY_PORT:-3010}"
+METADATA_FILE="${METADATA_FILE:-$HERE/pool-metadata.json}"
 
 if [ "$POOL_COST" -lt "$MIN_POOL_COST" ]; then
   echo "error: POOL_COST $POOL_COST is below the network's minPoolCost $MIN_POOL_COST" >&2; exit 1
@@ -85,6 +91,18 @@ elif [ -n "${RELAY_IPV4:-}" ]; then
 else
   echo "error: set RELAY_HOST=<dns name> or RELAY_IPV4=<address> so peers can reach this node" >&2
   exit 1
+fi
+
+# The chain stores only the URL and the hash; the readable name lives in the
+# JSON published at that URL, so both are optional and travel together.
+META_ARGS=()
+if [ -n "${METADATA_URL:-}" ]; then
+  [ -r "$METADATA_FILE" ] || { echo "error: METADATA_URL set but $METADATA_FILE is not readable" >&2; exit 1; }
+  META_HASH="$("$CLI" dijkstra stake-pool metadata-hash --pool-metadata-file "$METADATA_FILE")"
+  META_ARGS=(--metadata-url "$METADATA_URL" --metadata-hash "$META_HASH")
+  echo "metadata:      $METADATA_URL"
+  echo "               $METADATA_FILE -> $META_HASH"
+  echo "               publish that exact file at that URL, or validation fails"
 fi
 
 for f in cold.vkey cold.skey vrf.vkey bls.skey payment.vkey payment.skey payment.addr stake.vkey stake.skey; do
@@ -114,7 +132,7 @@ make_certs() {
     --pool-margin "$MARGIN" \
     --pool-reward-account-verification-key-file "$KEYS_DIR/stake.vkey" \
     --pool-owner-stake-verification-key-file "$KEYS_DIR/stake.vkey" \
-    "${RELAY_ARGS[@]}" "${NET[@]}" \
+    "${RELAY_ARGS[@]}" "${META_ARGS[@]}" "${NET[@]}" \
     --out-file "$WORK/pool-registration.cert"
 
   "$CLI" dijkstra stake-address registration-certificate \
@@ -213,7 +231,21 @@ EOF
 }
 
 case "$STEP" in
-  certs)  make_certs ;;
+  certs)
+    make_certs
+    cat <<EOF
+
+Certificates only — **nothing has been submitted**. A certificate is a file
+until it is inside a transaction that lands on chain. Next:
+
+  $0 build     # assemble and sign, still no submission
+  $0 submit    # and send it
+
+Pass the same RELAY_HOST / METADATA_URL each time: every step rebuilds the
+certificates from the environment, so omitting METADATA_URL would quietly
+register a pool with no name.
+EOF
+    ;;
   build)  make_certs; build_tx ;;
   submit) make_certs; build_tx; submit_tx ;;
   *) echo "usage: $0 [certs|build|submit]" >&2; exit 2 ;;

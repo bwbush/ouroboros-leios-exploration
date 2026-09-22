@@ -4,6 +4,76 @@ Reverse-chronological log. Newest date sections first; newest entries first with
 
 ## 2026-09-22
 
+### Brought the musashi documentation up to date ⏳🤖
+
+A day of incremental edits left the `musashi/` docs describing a node that no longer exists, so I swept them. The two that mattered:
+
+**The cheatsheet still said the pod had never been started.** Its status warning told the reader to "expect to debug the first `podman kube play`" and that the sandbox could not run one — true when written, actively misleading once a relay had run for a day and a producer was forging-eligible. Replaced with what has actually been exercised (pin-config, both pods, both key scripts, the registration, the faucet delegation) and what has not (KES rotation, re-pinning after a respin, the aarch64 image), and a note that the version-skew stall in Troubleshooting is a real incident rather than a hypothetical. The relay framing stays, since it is the right starting point for a new node and the fallback when debugging a producer — but an IMPORTANT box now says this deployment runs the producer, names the pool, and warns that container names follow the pod (`musashi-relay-node` vs `musashi-bp-node`, which six stale examples had wrong).
+
+**The CLI advice was a version behind.** Both guides told the reader to `podman cp` the binary out of the relay container; `nix develop` now provides it, and the relay container is gone. Fixed in the guides and in `make-spo-keys.sh`'s error message.
+
+Smaller corrections: the verified dates moved to 2026-09-22; two section cross-references in the block-producer guide pointed at the wrong numbers after the renumbering; `pin-config.sh` and `musashi-relay.yaml` referred to *the* pod spec when there are now two; and the repository README and AGENTS blueprint described `musashi/` as one pod spec plus a cheatsheet, when it is two specs, four scripts, the published pool metadata, and two guides. 0 broken relative links repo-wide.
+
+Left alone, as they are Brian's to keep or discard: two screenshots and two run logs sitting untracked in `musashi/`.
+
+Brian also asked what a respin will cost him, so the sweep gained a runbook: [block-producer.md § 7](../musashi/block-producer.md). The division is the useful part — **the keys survive a respin and must not be regenerated** (they are keys, not chain state, so the pool id, both addresses, and the published metadata all stay valid), while the registration, the stake, the delegation, and the deposits all go with the dead chain. The step that is easy to miss: **KES periods restart from the new `systemStart`**, so an existing op-cert at period 10 is a certificate from the future on a chain that begins at period 0, and the node refuses it. Re-issue it *after* re-pinning, so the script reads the new genesis — an ordering constraint worth writing down, since the failure mode looks like a broken certificate rather than a stale one.
+
+### The pool is registered, with its Leios voting key on chain ⏳🤖
+
+`query pool-state` confirms pool `88610017…` (`pool13pssq9…`) live in **epoch 62**: relay `thelio.functionally.dev:3010`, metadata hash `cb61d75a…` with the Pinata URL, cost 170000000, margin 0, pledge 0, deposit 500000000, and one delegator — its own stake key, so the self-delegation in the registration transaction took effect.
+
+The part worth recording is `spsBlsKey`: a **96-byte `blsPubKey`** and **48-byte `blsPossessionProof`**, with `bksRegisteredIn: 62`. Those are the sizes the ledger types predicted for BLS12-381 min-sig (G2 public key, G1 proof) and the same pair I read out of the certificate's CBOR before submission — so the chain now shows the Leios voting key registered end to end, from `key-gen-BLS` through the pool certificate to `pool-state`. It is honored while `epoch < 62 + 374`, i.e. until epoch **436**, which lands 2026-12-25; the op-cert covers KES periods 10–72 expiring 2026-12-24. The two ≈93-day rotation clocks we derived separately land within a day of each other, as the derivation said they would.
+
+`kes-period-info` is clean: within the correct interval, on-disk counter 0, node counter null because nothing has been minted yet — expected for a pool whose stake has not been snapshotted.
+
+Also corrected a conceptual gap in the guide for the next question: stake is **delegated, not sent**. Nothing is transferred to a pool; the ADA stays where it is and a delegation certificate points its stake credential at the pool, so the pool's active stake is the sum of balances of the addresses delegating to it.
+
+### Withdrew a false negative: the producer's port was open all along ⏳🤖
+
+I had reported twice that `thelio.functionally.dev:3010` was unreachable from outside. That was wrong, and the fault was in the instrument. Timing the connects gave it away: this sandbox "connects" to that host's ports 22 and 443 in **0.001 s** — impossible against a host ~30 ms away — while dropping 3000, 3010, and 9999, and making a genuine 1.8 s connection to the bootstrap relay's 3001. So an interception layer here accepts some destinations locally and silently drops the rest; "closed/filtered" was this environment's egress policy, not pfSense's.
+
+Brian's own evidence was the reliable kind and said the opposite: `nc -vz thelio.functionally.dev 3010` from an unrelated machine **succeeded**, and the address it reached — `64:ff9b::a161:e49a` — is the NAT64 well-known prefix wrapping 161.97.228.154, so even IPv6-only peers reach the producer through their ISP's translator. The forward works.
+
+What actually fails is only the hairpin case: darter reaching its own WAN address. pfSense's Pure NAT reflection needs the companion "automatic outbound NAT for reflection" setting, and client-and-server-on-one-host is reflection's worst case anyway; the robust fix is a DNS host override so the name resolves to 192.168.1.12 on the LAN, which also stops the node ever dialing its own advertised address when ledger peers hand back its own relay record. None of it affects the node.
+
+Recorded the general lesson in [meta-lessons-learned.md](../meta-lessons-learned.md): a negative result is a claim about the instrument as much as the world, and calibrating with a must-succeed and a must-fail control costs one command.
+
+### Fixed a deadlock in my own key script: the op-cert needed a node that could not start ⏳🤖
+
+Brian tore down the relay, started the producer, and it exited on `FileDoesNotExistError "/keys/opcert.cert"`. The certificate had never been issued, and `make-spo-keys.sh opcert` required a node socket to read the tip — but the only node was the producer, which will not start without the certificate. A deadlock I built and then walked him into, having twice mentioned the step without noticing it was unreachable at that point in the sequence.
+
+The fix removes the dependency rather than documenting around it. `current_slot()` now prefers the node and falls back to the wall clock: musashi runs one era at one second per slot from genesis — byron `startTime` equals shelley `systemStart`, both 2026-09-07T00:00:00Z — so `slot = (now − systemStart) / slotLength` is exact, not approximate. Checked against a live tip before trusting it: 2026-09-21T16:28:28Z computes 1,268,908, which is precisely what `ping --tip` reported from five relays. The `all` path no longer needs to skip the op-cert either.
+
+Issued the certificate at KES period 10 (slot 1,344,377) into `musashi/keys/`, which is a shared tree — the certificates Brian built at 13:14 are visible here, which is how I could also verify his registration certificate before submission: it carries `thelio.functionally.dev`, the Pinata URL, and the metadata hash `cb61d75a…`, and `--expected-hash` against the live gateway reports "Hashes match!". The cold counter advanced 0 → 1, and the certificate itself carries counter 0, correct for a first issuance.
+
+### Worked out how to publish pool metadata without a web server ⏳🤖
+
+Brian would rather not run a web server for one 193-byte JSON file. IPFS works, and the mechanics are now measured rather than assumed: `cardano-cli`'s metadata fetcher supports `file`, `http`, `https`, and **`ipfs`**, where the IPFS scheme resolves through a gateway named by the **`IPFS_GATEWAY_URI` environment variable** — no flag — and the CLI requests `<gateway>/ipfs/<cid>`. Running it proved both halves: without the variable it fails with a message naming it, and with `https://ipfs.io` set it fetches and gets **HTTP 429** plus a notice that the gateway is "switching to a service worker gateway only". So public path-style gateways are not a safe default; `dweb.link` or a pinning service's own gateway is.
+
+The recommendation in [§ 3.3](../musashi/block-producer.md) is to put the file on IPFS but register an **https gateway URL** rather than a bare `ipfs://` one, because the consumers of pool metadata — explorers and SMASH-style aggregators — fetch http(s); a bare `ipfs://` URL risks the name never being displayed anywhere. Measured every candidate against the 128-byte URL limit, which caught one trap: a gist raw URL *with* its commit-sha path segment is 138 bytes and does not fit, while the shorter latest-revision form is 97 and does.
+
+Two operational notes recorded with it: pin the content or the chain ends up pointing at a CID nothing serves, and the on-chain hash is blake2b-256 of the file's bytes and independent of the CID, so `--expected-hash` verifies over any scheme.
+
+### Settled the pool's metadata, and hit the ticker length limit ⏳🤖
+
+The pool will be **ΛΕΙΟΣ** with ticker **ΘΕΛΩ** — θέλω, "I wish / I will", after the host it runs on. [`musashi/pool-metadata.json`](../musashi/pool-metadata.json) is 193 bytes, hash `9ac759ba…`, and needs publishing at `https://thelio.functionally.dev/pool-metadata.json` before registration; `register-pool.sh` takes `METADATA_URL` and hashes the local file itself so the two cannot drift.
+
+`THELIO` was the request and is impossible: the ticker field allows **3–5 characters** and it is six, which the CLI rejects outright. Measuring the whole metadata schema against the w36 validator rather than quoting it turned up two more corrections to received wisdom — `name` is bounded in *characters* (50 Greek capitals = 100 bytes pass; 51 characters fail), the only byte-denominated limit is the 512-byte file cap, `homepage` has no length check at all despite the usual "≤ 64" claim, and the metadata **URL** limit is 128 bytes rather than 64 on this network, because `Url`'s decoder widened at protocol version 9 and musashi runs 12. Recorded as § 3.3 of [block-producer.md](../musashi/block-producer.md).
+
+One caveat carried into that section: a Greek ticker passes *this* validator, but the off-chain metadata-registry convention is `[A-Z0-9]{3,5}`, so explorers that assume ASCII may render boxes. On an ephemeral testnet with no registry that is a cosmetic risk, and Brian chose the Greek knowingly.
+
+### Recorded the producer's public address ⏳🤖
+
+The block producer will be reachable at **`thelio.functionally.dev` → 161.97.228.154**, TCP 3010 forwarded from the WAN by pfSense. Recorded as a "This deployment" table at the top of [block-producer.md](../musashi/block-producer.md), with the recommendation to register the **DNS name** rather than the address in the relay record, so a WAN-address change needs no re-registration. Verified: an A record only (no AAAA), PTR `161-097-228-154.v4.mynextlight.net`.
+
+Two loose ends flagged there rather than guessed at. The LAN host was given earlier as `darter` at 192.168.1.12 while the public name is `thelio`, and `darter.functionally.dev` does not resolve — either the producer moved hosts or the public name is the WAN's; that belongs in the table before registration, because the certificate advertises it on chain. And **TCP 3010 was not reachable from here** at the time of writing, which is either the pod not running yet or the host's own firewall, not the pfSense rule.
+
+### Closed the metrics port to the public ⏳🤖
+
+Brian asked which ports need opening, and answering it found a loose end in my own pod specs: both published **12798 on all interfaces**, because `hostPort` in a `podman kube` spec binds `0.0.0.0` unless told otherwise. The node's Prometheus endpoint is unauthenticated, and `pin-config.sh` deliberately rebinds it from loopback to `0.0.0.0` *inside* the container so the host can scrape it — which makes the host-side mapping the only thing standing between it and the internet. Both specs now set `hostIP: 127.0.0.1` on that port (a field `podman kube play` supports), with a comment saying why, and `protocol: TCP` spelled out on both ports.
+
+So the answer is one port: **TCP 3010 inbound**, which must equal the `--pool-relay-port` in the registration certificate. The node socket is a Unix socket, and everything else the node needs is outbound.
+
 ### Dropped darwin from the flake ⏳🤖
 
 Brian confirmed the new shell works and that this effort does not need darwin, so both nix files are Linux-only now: [`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix) keeps the x86_64-linux and aarch64-linux release assets (with a note that upstream publishes an aarch64-darwin tarball if that ever changes), and the flake switched from `eachDefaultSystem` to `eachSystem [ "x86_64-linux" "aarch64-linux" ]`. Two simplifications fell out: the `dontFixup` rationale no longer has to explain darwin's `@executable_path` dylib layout, and the per-system guard on the shell's build inputs is gone, since both remaining systems have an asset. The flake comment records why darwin is absent, including that x86_64-darwin could not evaluate anyway — nixpkgs marks `arrow-cpp`, which the R and Python stacks pull in, broken there.

@@ -1,9 +1,9 @@
 # Turning the relay into a single-node block producer
 
-**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation · **Verified:** 2026-09-21
+**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation · **Verified:** 2026-09-22
 
 Deliberately **one node that both relays and produces** — no relay/producer
-split. That is not how a mainnet pool is run, and § 6 says what you are giving
+split. That is not how a mainnet pool is run, and § 8 says what you are giving
 up; on a testnet whose point is observation it is a reasonable trade.
 
 > [!IMPORTANT]
@@ -35,20 +35,77 @@ up; on a testnet whose point is observation it is a reasonable trade.
 > which is the same case [the instrumentation note](../artifacts/leios-tx-flow-instrumentation.md)
 > makes for collecting logs.
 
-Everything here uses the **w36** CLI from the image you are running
-(`podman cp musashi-relay-node:/usr/local/bin/cardano-cli .`), whose
-`dijkstra` command group carries the Leios additions.
+Everything here uses the **w36** CLI whose `dijkstra` command group carries the
+Leios additions. `nix develop` at the repository root provides it (plus
+`cardano-node`, `tx-firehose`, and `mempool-monitor`) from
+[`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix);
+`podman cp musashi-bp-node:/usr/local/bin/cardano-cli .` is the fallback.
 
 ```shell
 export CARDANO_NODE_SOCKET_PATH=$PWD/data/node.socket
 export CARDANO_NODE_NETWORK_ID=164     # or pass --testnet-magic 164
 ```
 
-## 0. Two host prerequisites
+## 0. This deployment
 
-- **A public IP and an open port**, so peers can reach you — and, in the
-  Rewards Program, so the operators' `cardano-ping` probe can. Your single node
-  *is* the relay you register, so this is not optional here.
+| | |
+|---|---|
+| **Public address** | `thelio.functionally.dev` → **161.97.228.154** (A record only, no AAAA; PTR `161-097-228-154.v4.mynextlight.net`, verified 2026-09-22) |
+| **Inbound port** | TCP **3010**, forwarded on a pfSense WAN rule to the block producer on the LAN |
+| **Relay record** | register `--single-host-pool-relay thelio.functionally.dev --pool-relay-port 3010` — the DNS name, not the address, so a WAN-address change needs no re-registration |
+| **Pool name / ticker** | **ΘΕΛΩ** / `THELO` — θέλω, "I wish / I will", after the host. The ticker is the Latin transliteration at exactly the 5-character limit, which sidesteps the `[A-Z0-9]` registry convention (§ 3.3) |
+| **Metadata** | [`pool-metadata.json`](./pool-metadata.json), 191 bytes, hash `cb61d75ac00a5c372481fdb5117c03c12b08c1054b306bb20f03cc3498134677`, published on IPFS and served at `https://functionally.mypinata.cloud/ipfs/QmcyS1urh1df3Qw8nHY2wAX1e2V75s8ePdTFCUiGY9RyiM` (87 bytes, within the 128-byte limit). Verified 2026-09-22: the CLI fetches that URL, validates the schema, and reports "Hashes match!" |
+
+> [!NOTE]
+> **Settled 2026-09-22 from the pfSense rule** ("musashi at darter", WAN address
+> TCP 3010 → 192.168.1.12:3010): the producer runs on **darter** at
+> 192.168.1.12, and `thelio.functionally.dev` is the *WAN's* name, not the
+> host's. The relay record therefore names the public name correctly, and
+> `darter.functionally.dev` not resolving is expected.
+
+> [!NOTE]
+> **Registered on chain 2026-09-22, epoch 62.** `query pool-state` confirms
+> pool `88610017a37cfcbf497127b1be43efd71376bd52f3bb8773b3dcf838`
+> (`pool13pssq9ar0n7t7jt3y7cmusl06ufhd02j7wacwuanmnursyyr7qu`) with the relay
+> `thelio.functionally.dev:3010`, the metadata hash and Pinata URL, cost
+> 170000000, margin 0, pledge 0, deposit 500000000, one delegator (its own
+> stake key), and **`spsBlsKey` present** — a 96-byte `blsPubKey` and 48-byte
+> `blsPossessionProof`, `bksRegisteredIn: 62`, so the Leios voting key is
+> honored until epoch **436** (2026-12-25). The op-cert covers KES periods
+> **10–72**, expiring 2026-12-24 — the two ≈93-day clocks of § 6, landing within
+> a day of each other as expected.
+
+## 1. Two host prerequisites
+
+- **A public IP and exactly one open inbound port: TCP 3010**, so peers can
+  reach you. Your single node *is* the relay you register, so this is not
+  optional here, and the port must match the `--pool-relay-port` in the
+  registration certificate. Nothing else needs to be reachable: the node socket
+  is a Unix socket, and the Prometheus endpoint is bound to `127.0.0.1` in the
+  pod specs on purpose — it is unauthenticated, so scrape it from the host or
+  tunnel to it rather than opening 12798.
+- **Behind NAT, three things have to agree**: the forward (WAN TCP 3010 → the
+  host), the host's own firewall, and the relay record in the registration
+  certificate, which must name the address the *outside* sees. Use a DNS name
+  with `--single-host-pool-relay` if the WAN address is dynamic. Test from
+  outside the network — many routers fail to hairpin a connection from the LAN
+  to their own WAN address, so an inside test can fail while the forward is
+  fine:  `cardano-cli ping -h <public name> -p 3010 -m 164 -c 1`. On pfSense,
+  the per-rule **NAT reflection: Pure NAT** setting is only half of hairpinning;
+  the companion global switch — **System → Advanced → Firewall & NAT → "Enable
+  automatic outbound NAT for reflection"** — is what source-NATs the reflected
+  traffic so replies return through the firewall instead of going straight back.
+  Reaching your *own* host through the WAN address is reflection's hardest case,
+  and a **DNS host override** mapping the public name to the LAN address avoids
+  the mechanism entirely — worth doing regardless, since it also stops the node
+  from dialing its own advertised address when ledger peers hand back its relay
+  record.
+- **Rootless podman rewrites inbound source addresses.** With the default
+  `rootlesskit` port handler every inbound peer appears to come from one
+  container-side address (typically `10.0.2.100`) in the connection-manager
+  traces. Peering still works; it is the logs that mislead. Rootful bridge
+  networking preserves the real source. Check with
+  `podman info --format '{{.Host.Security.Rootless}}'`.
 - **An accurate clock.** A producer that drifts forges into the wrong slot.
   `sudo apt install -y chrony && sudo systemctl enable --now chrony`, or your
   platform's NTP equivalent.
@@ -70,8 +127,8 @@ RELAY_HOST=my.host ./register-pool.sh submit   # build, sign, and submit
 [`make-spo-keys.sh`](./make-spo-keys.sh) is idempotent in the only way that
 matters: it **refuses to overwrite existing credentials**, because a regenerated
 cold key is a different pool. Steps are separable — `keys`, `opcert` (also the
-KES-rotation step), `show`. It issues the op-cert only if the node socket is
-present, and tells you to come back for it otherwise.
+KES-rotation step), `show`. It issues the op-cert with or without a
+running node (see § 2), so it can be run before the producer's first start.
 
 [`register-pool.sh`](./register-pool.sh) builds all three certificates, picks
 the largest UTxO at the payment address, builds and signs the transaction, and
@@ -83,7 +140,7 @@ cover the deposits.
 The sections below explain what those scripts do, for when you want to do it by
 hand or check their work.
 
-## 1. Keys
+## 2. Keys
 
 Five key pairs, one of which is new in Leios. They all live in `keys/` next to
 the pod, gitignored.
@@ -111,7 +168,7 @@ cardano-cli dijkstra node key-gen \
 # VRF — leader election
 cardano-cli dijkstra node key-gen-VRF --verification-key-file vrf.vkey --signing-key-file vrf.skey
 
-# KES — block signing, rotated periodically (§ 5)
+# KES — block signing, rotated periodically (§ 6)
 cardano-cli dijkstra node key-gen-KES --verification-key-file kes.vkey --signing-key-file kes.skey
 
 # BLS — Leios vote signing.  This one does not exist outside the Dijkstra era.
@@ -119,10 +176,20 @@ cardano-cli dijkstra node key-gen-BLS --verification-key-file bls.vkey --signing
 ```
 
 The operational certificate binds the current KES key to the cold key for a
-window of KES periods. Compute the period from the tip:
+window of KES periods, and the period is the current slot divided by
+`slotsPerKESPeriod` (129,600 here). `make-spo-keys.sh opcert` derives it from
+the node when one is reachable and **from the wall clock otherwise** — which
+matters more than it sounds, because the producer will not start without the
+certificate, so a node-only path is a deadlock the first time. The clock is
+exact here: musashi runs one era at one second per slot from genesis (byron
+`startTime` equals shelley `systemStart`), so
+`slot = (now − systemStart) / slotLength`; checked against a live tip,
+2026-09-21T16:28:28Z gives slot 1268908, which is what the network reported.
+By hand:
 
 ```shell
-cardano-cli dijkstra query tip --testnet-magic 164        # take .slot
+cardano-cli dijkstra query tip --testnet-magic 164        # take .slot, if a node is up
+# or, with no node:  slot = $(( $(date -u +%s) - $(date -u -d 2026-09-07T00:00:00Z +%s) ))
 # musashi: slotsPerKESPeriod = 129600  =>  period = slot / 129600
 cardano-cli dijkstra node issue-op-cert \
   --kes-verification-key-file kes.vkey \
@@ -145,7 +212,7 @@ cardano-cli address build --payment-verification-key-file pay.vkey \
 Fund `pay.addr` from the [faucet](https://faucet.leios.play.dev.cardano.org/basic-faucet), then check it arrived: `cardano-cli dijkstra query utxo
 --address $(cat pay.addr) --testnet-magic 164`.
 
-### 1.1 Can the funding go to an address you already use?
+### 2.1 Can the funding go to an address you already use?
 
 Yes — a Cardano address encodes only *testnet vs mainnet*, not which testnet.
 Verified by building one key's address at four magics:
@@ -182,9 +249,9 @@ names inputs that exist on one chain only — but it does mean one compromise
 reaches both chains, and it entangles the pool's reward and owner accounts with
 whatever else that key does.
 
-## 2. Certificates
+## 3. Certificates
 
-### 2.1 The pool registration certificate — where the BLS key is registered
+### 3.1 The pool registration certificate — where the BLS key is registered
 
 There is no separate "register my Leios key" transaction: the BLS public key
 and its proof of possession ride on the pool certificate, and the CLI makes it
@@ -215,11 +282,18 @@ it is how other nodes learn to dial you, and EB diffusion is the thing you are
 here to observe. Use `--pool-relay-ipv4`/`--pool-relay-port` if you have no DNS
 name.
 
-### 2.2 Stake registration and delegation
+### 3.2 Stake registration and delegation
 
 Committee seating is **top `leiosCommitteeSize` pools by stake** (musashi:
-900), so a pool with zero active stake is seated nowhere and votes never. Give
-it stake:
+900), so a pool with zero active stake is seated nowhere and votes never.
+
+**Stake is delegated, not sent.** Nothing is ever transferred *to* a pool: the
+ada stays in its own address, and a delegation certificate points that
+address's stake credential at the pool. A pool's active stake is the sum of the
+balances of every address whose stake credential delegates to it, recomputed at
+each epoch snapshot. So there is no pool address to fund, and adding your own
+stake is just a matter of holding more ada at an address whose stake key is
+already delegated. Give it stake:
 
 ```shell
 cardano-cli dijkstra stake-address registration-certificate \
@@ -233,14 +307,133 @@ cardano-cli dijkstra stake-address stake-delegation-certificate \
 (`registration-and-delegation-certificate` does both in one, if you prefer.)
 
 Self-delegation of a 10,000-ada faucet payment is *far* too little stake to be
-scheduled. After registration, give the faucet's **delegate** widget your
-bech32 pool id and it delegates ~1,000,000 test ada:
+scheduled, so the real stake comes from the faucet's **delegate** widget — but
+**only after the pool is on chain**. Conway's DELEG rule checks the delegatee
+exists (`checkStakeDelegateeRegistered`: `targetPool \`Map.member\` pools ?!
+DelegateeStakePoolNotRegisteredDELEG`, [`Deleg.hs:218-222`](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/conway/impl/src/Cardano/Ledger/Conway/Rules/Deleg.hs#L218-L222)),
+so a delegation naming an unregistered pool fails phase-1 validation. The pool
+id is just a key hash and exists the moment the cold key does, so a faucet form
+will accept the string happily; it is the transaction that cannot succeed.
+
+Our own delegation certificate rides in the *same* transaction as the pool
+registration, which works because certificates are applied in order and
+`register-pool.sh` puts the pool certificate before the delegation. A separate,
+later transaction — the faucet's — has no such option.
+
+Once `query pool-state` shows the pool, give the widget the bech32 pool id and
+it delegates ~1,000,000 test ada. **Its transaction will look unrelated to your
+pool**, and that is expected: delegation is a *certificate* in the transaction
+body, not a payment, so an explorer's inputs-and-outputs view shows only the
+faucet paying its own fee — in our case 10 → 9.8 ada at one of its enterprise
+addresses (header byte `0x60`, no stake part at all, so that output stakes
+nothing anywhere). Confirm it three ways instead:
+
+- **Raw CBOR**: search the transaction for your pool's *hex* id. A
+  `stake_delegation` certificate is `(2, stake_credential, pool_keyhash)`, so
+  your hash appearing there is the delegation.
+- **`query pool-state`**: `spsDelegators` gains a second entry — the faucet's
+  stake credential. This reflects current delegations, not the snapshot, so it
+  updates immediately.
+- **`query stake-snapshot --stake-pool-id <hex>`**: `mark` jumps to the
+  delegated amount, and walks to `set` then `go` over the next two epochs.
+
+The size is a tell too: 367 bytes against ~228 for a minimal one-in-one-out,
+the difference being a delegation certificate plus the stake key's witness.
 
 ```shell
 cardano-cli dijkstra stake-pool id --output-bech32 --cold-verification-key-file keys/cold.vkey
 ```
 
-### 2.3 Submit
+### 3.3 Pool metadata, and what Unicode survives
+
+The name is **not on chain**: the certificate carries only `--metadata-url` and
+`--metadata-hash`, and everything readable lives in the JSON you publish at that
+URL. Unicode is fine there. Measured against the w36 CLI's validator, 2026-09-22
+(`cardano-cli dijkstra stake-pool metadata-hash`), not quoted from a schema:
+
+| Field | Limit | Notes |
+|---|---|---|
+| `name` | ≤ 50 **characters** | Counted in characters, not bytes: 50 Greek capitals (100 bytes) pass, 51 fail. `ΛΕΙΟΣ` verified. |
+| `ticker` | 3–5 **characters** | The CLI accepts `ΛΕΙΟΣ`, but the off-chain metadata-registry convention is `[A-Z0-9]{3,5}` — keep the ticker Latin so explorers render it as intended. |
+| `description` | ≤ 255 characters | 256 rejected. |
+| `homepage` | no length check | The validator does not bound it; only the file cap below does. |
+| whole file | **≤ 512 bytes** | The one byte-denominated limit, and where Greek costs double: two bytes per character. |
+| `--metadata-url` | ≤ **128 bytes** | `Url`'s decoder allows 128 from protocol version 9 onward and 64 before; musashi runs version 12, so 128 — a 67-character URL was accepted. |
+
+Greek in the name works — this deployment uses `ΘΕΛΩ` — and the length limit is
+what shaped the ticker: **`THELIO` is six characters and is rejected** ("must
+have at least 3 and at most 5 characters, but it has 6"), so the pool runs
+`THELO`, five Latin characters, which also keeps every explorer happy.
+`ΘΕΛΙΟ`, the transliteration, is exactly five and also validates, as does a
+truncated Latin `THELI`. After any edit to
+[`pool-metadata.json`](./pool-metadata.json), re-hash:
+
+```shell
+cardano-cli dijkstra stake-pool metadata-hash --pool-metadata-file pool-metadata.json
+```
+
+Then publish the file and pass both to the registration:
+
+```shell
+METADATA_URL=https://thelio.functionally.dev/pool-metadata.json ./register-pool.sh submit
+```
+
+#### Publishing it without a web server
+
+The chain stores an opaque URL, so the scheme is yours to choose, and
+`cardano-cli` can hash from `file`, `http`, `https`, and **`ipfs`** (measured
+2026-09-22 on the w36 CLI). IPFS works, with one wrinkle and one caveat.
+
+The wrinkle: the `ipfs://` scheme needs a gateway to resolve, which the CLI
+takes from an environment variable, not a flag —
+
+```shell
+$ cardano-cli dijkstra stake-pool metadata-hash --pool-metadata-url ipfs://<cid>
+Error: IPFS scheme requires IPFS_GATEWAY_URI environment variable to be set.
+$ IPFS_GATEWAY_URI=https://dweb.link cardano-cli dijkstra stake-pool metadata-hash --pool-metadata-url ipfs://<cid>
+```
+
+— and it requests `<gateway>/ipfs/<cid>`. Note that `https://ipfs.io` now
+answers that path with **HTTP 429** and a notice that it is "switching to a
+service worker gateway only", so pick a gateway that still serves paths
+(`dweb.link`) or a pinning service's own.
+
+The caveat is the one that matters: *we* can resolve `ipfs://`, but the
+consumers of pool metadata — explorers, SMASH-style aggregators — generally
+fetch `http(s)`. Registering a bare `ipfs://` URL means the pool's name may
+simply never be displayed anywhere. So put the file on IPFS and register an
+**https gateway URL** for it: no web server, and any consumer can fetch it.
+
+All of these fit the 128-byte URL limit (measured, with a 59-character CIDv1):
+
+| Form | Bytes |
+|---|---|
+| `ipfs://<cid>` | 66 |
+| `https://<cid>.ipfs.dweb.link` (subdomain) | 82 |
+| `https://dweb.link/ipfs/<cid>` (path) | 82 |
+| `https://gateway.pinata.cloud/ipfs/<cid>` | 93 |
+| `https://gist.githubusercontent.com/<user>/<id>/raw/pool-metadata.json` | 97 |
+
+A gist raw URL **with** the commit-sha path segment is 138 bytes and does *not*
+fit — use the shorter form that tracks the latest revision, and remember it
+then follows edits, so re-hash if you change the file.
+
+Two things to get right whichever transport you pick. **Pin the content**, on
+your own node or a pinning service; an unpinned CID stops resolving once caches
+evict it, and the chain will point at nothing. And verify after publishing —
+the on-chain hash is blake2b-256 of the file's bytes, independent of the CID, so
+the check works over any scheme:
+
+```shell
+cardano-cli dijkstra stake-pool metadata-hash \
+  --pool-metadata-url https://<cid>.ipfs.dweb.link \
+  --expected-hash cb61d75ac00a5c372481fdb5117c03c12b08c1054b306bb20f03cc3498134677
+```
+
+Changing the name later is an ordinary re-registration: publish new JSON, submit
+an updated certificate with the new hash. The deposit is not charged twice.
+
+### 3.4 Submit
 
 ```shell
 cardano-cli dijkstra transaction build \
@@ -258,7 +451,7 @@ cardano-cli dijkstra transaction submit --tx-file tx.signed --testnet-magic 164
 Three witnesses: the payment key pays, the stake key authorizes its own
 registration and delegation, the cold key authorizes the pool registration.
 
-## 3. The pod
+## 4. The pod
 
 `/app/run-node.sh` takes no key flags, so a producer must replace the command.
 [`musashi-bp.yaml`](./musashi-bp.yaml) is the relay spec plus a `keys` volume
@@ -280,7 +473,7 @@ other permission
 `make-spo-keys.sh` already sets `600` on every signing key, so this is only a
 thing to remember if you move files around by hand.
 
-## 4. Confirm it took
+## 5. Confirm it took
 
 ```shell
 # the pool is on chain
@@ -303,13 +496,25 @@ on the Leios side `Consensus.LeiosKernel.BlockForged`, `BlockAnnounced`,
 `Voted` / `NotVoted`, `VoteScheduled`, `BlockCertified`. `NotVoted` is the one
 to watch: it is how you learn you hold a seat but are failing a vote condition.
 
+**No restart is needed when the stake goes live.** The credentials were read at
+startup; what changes at the snapshot is the *ledger's* view, which the node
+learns by applying blocks. Forging is a per-slot leadership check against that
+state, and the Leios seat is looked up per vote attempt —
+`(getLeiosCommittee ls >>= getLeiosSeatId vk) ?>= NotOnCommittee`
+([`LeiosVoting.hs:341`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosVoting.hs#L341)),
+with `vk` derived from the loaded signing key — so nothing is cached across the
+boundary. Until you are seated, expect `NotVoted` with reason
+**`NotOnCommittee`**; afterwards it simply starts voting. A restart is only
+needed when the *node's own* inputs change: new keys or op-cert, or an edited
+`config.json`.
+
 **Timing.** Stake registered in epoch *N* is active in *N+2*; musashi epochs
 are 21,600 slots at 1 s, so **6 hours each** — expect eligibility 12–18 hours
 after submission, and committee seating on the same snapshot boundary, since
 [the committee is taken from the stake distribution](../artifacts/leios-node-protocol-parameters.md)
 carrying whichever BLS keys are registered.
 
-## 5. Two rotations, both about 93 days
+## 6. Two rotations, both about 93 days
 
 - **KES**: `maxKESEvolutions = 62` × `slotsPerKESPeriod = 129600` s ⇒ ~93 days
   from the `--kes-period` you issued at. Then generate a new KES key, issue a
@@ -322,7 +527,63 @@ carrying whichever BLS keys are registered.
   aged out is *keyless*: it occupies a committee seat, cannot vote, and any
   certificate bit set on it invalidates that certificate.
 
-## 6. What a single node costs you
+## 7. When the network is respun
+
+Upstream respins musashi "every couple of weeks", and a respin is a new chain
+instance: the pool registration, the stake, the delegation, and the KES clock
+all go with it. The keys do not.
+
+**What survives** — and therefore what you must *not* regenerate:
+
+- Every key pair in `keys/`. They are keys, not chain state. `make-spo-keys.sh`
+  refuses to overwrite them, which is exactly right here.
+- **The pool id**, since it is the cold key's hash: `pool13pssq9…` stays yours,
+  so the faucet's delegate widget takes the same string as before.
+- The published metadata — `pool-metadata.json`, its IPFS CID, and the hash in
+  the certificate are all chain-independent.
+- Both addresses (`payment.addr`, `stake.addr`): testnet addresses encode no
+  chain identity, so they are valid on the new instance, just empty.
+- The pod specs, the scripts, the NAT forward, the DNS record.
+
+**What has to be redone, in this order** — the order matters at step 3:
+
+```shell
+cd musashi
+./pin-config.sh                         # 1. new genesis, new systemStart, new MinNodeVersion
+rm -rf data                             # 2. the old chain DB and LeiosDb are for a dead chain
+#    3. bump BOTH pod specs to the image week the new network declares
+#       (grep MinNodeVersion config/config.json; tag AND digest, in
+#       musashi-relay.yaml and musashi-bp.yaml)
+./make-spo-keys.sh opcert               # 4. KES periods restart from the new genesis
+podman kube play musashi-bp.yaml        # 5. and let it sync
+```
+
+Step 4 is the one that is easy to miss and impossible to skip: the KES period
+is derived from the chain's own `systemStart`, so a respun network starts at
+period 0 while your existing certificate says period 10 — a certificate from
+the *future*, which the node will refuse. Re-issue it **after** re-pinning, so
+the script reads the new genesis. The cold counter advances (1 → 2 here), which
+is harmless: a fresh chain has no recorded counter to conflict with.
+
+Then repeat the registration cycle, exactly as the first time:
+
+```shell
+#    fund payment.addr at the faucet, then
+RELAY_HOST=thelio.functionally.dev METADATA_URL=https://functionally.mypinata.cloud/ipfs/QmcyS1urh1df3Qw8nHY2wAX1e2V75s8ePdTFCUiGY9RyiM   ./register-pool.sh submit
+#    then the faucet's delegate widget with the same pool id, then wait ~2 epochs
+```
+
+The 500 ₳ deposit and the 2 ₳ stake-key deposit are charged again — new chain,
+new deposits — and `bksRegisteredIn` resets to the new epoch, which restarts
+the BLS key's 374-epoch clock along with the KES one.
+
+Finally, update [§ 0](#0-this-deployment) with the new epoch and dates, and
+check whether the respin moved any Leios parameter: `pin-config.sh` prints the
+periods, committee size, quorum, and derived certification gap on every run, so
+a diff of that output against this document is the cheapest parameter check
+there is.
+
+## 8. What a single node costs you
 
 Honest list, since you asked for this shape deliberately:
 

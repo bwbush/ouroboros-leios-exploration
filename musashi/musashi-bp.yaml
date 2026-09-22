@@ -1,12 +1,12 @@
 # Podman kube spec: the musashi relay, but forging.
 #
-# One node doing both jobs — see block-producer.md § 6 for what that costs.
+# One node doing both jobs — see block-producer.md § 8 for what that costs.
 # Switch over from the relay (the chain DB is shared, so no resync):
 #
 #   podman kube down musashi-relay.yaml
 #   podman kube play musashi-bp.yaml
 #
-# Needs ./keys populated per block-producer.md §§ 1-2, with `chmod 600 keys/*.skey`.
+# Needs ./keys populated per block-producer.md §§ 2-3, with `chmod 600 keys/*.skey`.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -52,9 +52,15 @@ spec:
         - name: n2n
           containerPort: 3010
           hostPort: 3010
+          protocol: TCP
         - name: metrics
           containerPort: 12798
           hostPort: 12798
+          protocol: TCP
+          # Loopback only. This is the one port that must NOT be public: the
+          # node's Prometheus endpoint is unauthenticated. Scrape it from the
+          # host, or tunnel to it; do not open 12798 in a firewall.
+          hostIP: 127.0.0.1
       volumeMounts:
         - name: config
           mountPath: /app/config
@@ -75,7 +81,7 @@ spec:
         type: Directory
     - name: data
       hostPath:
-        path: ./data
+        path: /data/musashi
         type: DirectoryOrCreate
     - name: keys
       hostPath:

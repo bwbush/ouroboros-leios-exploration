@@ -1,14 +1,30 @@
 # Running a musashi Leios node — cheatsheet
 
-**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation (`cardano-node@leios-prototype`) · **Verified:** 2026-09-21
+**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation (`cardano-node@leios-prototype`) · **Verified:** 2026-09-22
 
-> [!WARNING]
-> **What is and isn't tested.** Every fact below — image digest, entrypoint,
-> ports, config contents, CLI flags — was read from the published image
-> metadata, the live network config, or pinned source, and `./pin-config.sh`
-> was run end to end. The pod itself was **not** started here: this sandbox
-> forbids the nested user namespace podman needs. Expect to debug the first
-> `podman kube play`, and record what it took in [the journal](../journal/phase-0.md).
+> [!IMPORTANT]
+> **This deployment now runs a block producer, not a relay.** Pool **ΘΕΛΩ**
+> (`THELO`, `pool13pssq9ar0n7t7jt3y7cmusl06ufhd02j7wacwuanmnursyyr7qu`) has been
+> registered on chain since epoch 62, 2026-09-22, and the running pod is
+> [`musashi-bp.yaml`](./musashi-bp.yaml) — container `musashi-bp-node`. This
+> page still describes the **relay**, which is the right starting point for a
+> new node and the thing to fall back to when debugging: everything in it
+> applies to both, since the producer is the same pod plus credentials. For the
+> producer specifics — keys, certificates, deposits, rotations, what a
+> single-node setup costs — see [block-producer.md](./block-producer.md).
+>
+> Container names follow the pod: `musashi-relay-node` under the relay spec,
+> `musashi-bp-node` under the producer's. Examples below use the producer's.
+
+> [!NOTE]
+> **What has actually been exercised**, as of 2026-09-22: `pin-config.sh`, the
+> relay pod (run from 2026-09-21), the producer pod, both key scripts, the
+> registration transaction, and the faucet delegation. The version-skew stall
+> in Troubleshooting is a real incident, not a hypothetical. Still unexercised:
+> the KES rotation, re-pinning after the network is respun, and the
+> `aarch64-linux` image. Facts about the image, config, and CLI flags come from
+> the published metadata, the live network config, or pinned source — the
+> documents say which.
 
 ## TL;DR
 
@@ -16,13 +32,13 @@
 cd musashi
 ./pin-config.sh                       # fetch the live network config
 podman kube play musashi-relay.yaml   # start the relay
-podman logs -f musashi-relay-node     # watch it sync
+podman logs -f musashi-bp-node        # watch it sync
 podman kube down musashi-relay.yaml   # stop and remove
 ```
 
 ## What this gives you
 
-A single **non-block-producing relay** on `musashi` (the public Leios
+The relay spec gives a **non-block-producing** node on `musashi` (the public Leios
 prototype testnet, network magic **164**), following the chain from the
 bootstrap relay `leios-node.play.dev.cardano.org:3001` and fanning out to
 ledger peers once past slot 151,200 (`useLedgerAfterSlot` in `topology.json`).
@@ -31,8 +47,8 @@ ledger peers once past slot 151,200 (`useLedgerAfterSlot` in `topology.json`).
 |---|---|
 | `./config/` | The pinned network configuration, mounted read-only at `/app/config`. Gitignored — it rolls. |
 | `./data/` | Chain DB (`db/`), Leios SQLite stores (`leios.db*`), `node.socket`, `node.log`. Gitignored. |
-| `localhost:3010` | Node-to-node. Inbound isn't needed to sync, but it's what makes this a relay. |
-| `localhost:12798` | Prometheus metrics (see the rebind note under [Step 1](#step-1--pin-the-live-network-configuration)). |
+| `:3010` | Node-to-node, published on all interfaces. **The only port that needs to be public.** Inbound isn't needed to sync, but it is what makes this a relay. |
+| `127.0.0.1:12798` | Prometheus metrics, bound to loopback in the pod spec because the endpoint is unauthenticated (see the rebind note under [Step 1](#step-1--pin-the-live-network-configuration)). |
 
 The image is `ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet`,
 tag **`prototype-2026w36`**, digest-pinned in the YAML (multi-arch
@@ -108,8 +124,8 @@ Run it **from this directory**: the YAML uses relative `hostPath` volumes
 ## Step 3 — confirm it is syncing
 
 ```shell
-podman logs -f musashi-relay-node            # or: tail -f data/node.log
-podman exec musashi-relay-node cardano-cli query tip --testnet-magic 164
+podman logs -f musashi-bp-node              # or: tail -f data/node.log
+podman exec musashi-bp-node cardano-cli query tip --testnet-magic 164
 curl -s localhost:12798/metrics | grep -i leios
 ```
 
@@ -156,7 +172,7 @@ puts `cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on
 .#cardano-cli` gets just the CLI. Bump the week there when the network rolls.
 
 Two alternatives: the image's `cardano-cli` is statically linked, so `podman cp
-musashi-relay-node:/usr/local/bin/cardano-cli .` is the quick way to get one;
+musashi-bp-node:/usr/local/bin/cardano-cli .` is the quick way to get one;
 or build from upstream's flake, at the release tag whose `flake.lock` pins the
 same `cardano-node` rev the image reports:
 
@@ -183,7 +199,7 @@ or it will start building GHC. The flake also needs
 | Start again | `podman pod start musashi-relay` |
 | Stop and remove the pod | `podman kube down musashi-relay.yaml` |
 | Recreate after editing the YAML | `podman kube play --replace musashi-relay.yaml` |
-| Shell in | `podman exec -it musashi-relay-node bash` |
+| Shell in | `podman exec -it musashi-bp-node bash` |
 | Reset the chain state | `podman kube down musashi-relay.yaml && rm -rf data` |
 
 ## Troubleshooting
@@ -213,6 +229,10 @@ changed, the chain is a new instance and the old database is worthless** —
 pin to see what moved; the hashes there are of the published bytes, so they
 compare directly with the ones recorded in
 [the parameter note](../artifacts/leios-node-protocol-parameters.md#sources).
+
+A respin is more than a re-pin for a *producer*: the registration, stake, and
+KES clock all reset while the keys survive. The runbook is
+[block-producer.md § 7](./block-producer.md#7-when-the-network-is-respun).
 
 `./config` and `./data` are gitignored on purpose. Committing a snapshot of a
 rolling network config is exactly the trap upstream fell into — their

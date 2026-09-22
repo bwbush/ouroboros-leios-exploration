@@ -19,7 +19,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 | How do I turn the relay into a block producer, with a Leios voting key? | [musashi/block-producer.md](./musashi/block-producer.md) — keys, certificates, deposits, rotations |
 | How do I collect data on transaction flow — push, pull, mempool, cache — from a running node? | [Collecting transaction-flow data](./artifacts/leios-tx-flow-instrumentation.md) — namespace map, config patch, jq recipes |
 | What tools exist for working with a running Leios node — CLI, load generators, local devnets, offline analysis? | [Tooling for a running Leios node](./artifacts/leios-node-tooling.md) — verified by running the image's own binaries |
-| How do I run a node on the musashi testnet myself? | [musashi/cheatsheet.md](./musashi/cheatsheet.md) — a podman relay, with the config-pinning trap that stops it syncing |
+| How do I run a node on the musashi testnet myself? | [musashi/cheatsheet.md](./musashi/cheatsheet.md) — a podman relay, with the config-pinning and image-week traps that stop it syncing |
 | How do the kleioscan chain metrics, the node's telemetry funnel, and the models' alignment quantities line up? | [Mempool-alignment metric mapping](./artifacts/leios-mempool-metrics-mapping.md) |
 | What does a Leios term or parameter mean? | [Leios cheatsheet](./artifacts/leios-cheatsheet.md) — written for a new team member on day one |
 | What have we actually confirmed, with a date and a source? | [facts.md](./facts.md) |
@@ -31,7 +31,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 - `AGENTS.md` — the charter: mission, goals, constraints, repository blueprint, conventions, and analysis instructions. Read before contributing.
 - `CLAUDE.md` — Claude-specific addenda; defers to `AGENTS.md`.
 - `artifacts/` — synthesis documents, source maps, and diagrams (the table above).
-- `musashi/` — a runnable podman setup for a node on the musashi testnet: the pod spec, a config-pinning script, and a cheatsheet. Its `config/`, `data/`, and `keys/` are gitignored.
+- `musashi/` — the live node on the musashi testnet: two `podman kube` pod specs (relay and block producer), a config-pinning script, credential and registration scripts, the pool's published metadata, and two guides. Since 2026-09-22 this runs a registered block producer, pool **ΘΕΛΩ** (`THELO`). Its `config/`, `data/`, and `keys/` are gitignored.
 - `journal/` — dated work log, newest first. A historical record: existing text is not edited.
 - `facts.md` — verified findings, each with its date, source, and layer.
 - `meta-lessons-learned.md` — append-only log of methodology and process lessons.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Pin the live musashi network configuration (the Leios prototype testnet)
-# into ./config, where musashi-relay.yaml mounts it read-only at /app/config.
+# into ./config, which both pod specs mount read-only at /app/config.
 #
 # WHY THIS EXISTS: the published relay image bakes in ouroboros-leios'
 # testnet/config snapshot, which is pinned to an older chain instance
@@ -78,7 +78,7 @@ done
 if [ "$EXPOSE_METRICS" != "0" ]; then
   # The published config binds PrometheusSimple to 127.0.0.1, which inside a
   # container means "unreachable from the host" — the hostPort mapping in
-  # musashi-relay.yaml would forward to nothing. Rebind to 0.0.0.0; the port
+  # the pod specs would forward to nothing. Rebind to 0.0.0.0; the port
   # is still only exposed as far as the pod's port mapping allows.
   sed -i.bak 's/PrometheusSimple suffix 127\.0\.0\.1 /PrometheusSimple suffix 0.0.0.0 /' "$tmp/config.json"
   rm -f "$tmp/config.json.bak"
