@@ -4,5 +4,9 @@ config/
 data/
 # Captured operational logs kept beside the runbook.
 *.log
-# Block-producer credentials.
+*.log.gz
+# Python runtime artifacts from local analysis.
+__pycache__/
+*.py[cod]
+# Plaintext block-producer credentials. The encrypted keys.tar.asc archive is intentionally tracked.
 keys/

@@ -68,6 +68,8 @@ Five key pairs, one of which is new in Leios. They all live in `keys/` next to t
 
 > [!NOTE]
 > **Key handling here is deliberately unceremonious.** These credentials exist for one ephemeral testnet and are never reused on mainnet, preprod, or preview. They survive a respin of the same testnet deployment — so there is no cold-key ceremony, no air-gapped machine, and no backup discipline in this procedure. Two mechanical precautions survive anyway, neither about secrecy: the node **refuses to start** if the verifiable random function (VRF) signing key is group- or world-readable, and the script refuses to overwrite an existing key set because a new cold key means re-registering the pool and re-requesting the faucet delegation. Do not copy this section's habits to a pool that matters.
+>
+> The encrypted `keys.tar.asc` archive is an intentional, testnet-only tracked exception to the `keys/` ignore rule. Its decryption key and every plaintext credential must remain outside this repository. Do not reuse any credential from the archive on another network.
 
 ```shell
 mkdir -p keys && cd keys
@@ -300,6 +302,8 @@ cardano-cli dijkstra query leadership-schedule --genesis config/shelley-genesis.
 
 In the log, the producer-only traces appear: `Forge.Loop.*` (`StartLeadershipCheck` → `NodeIsLeader`/`NodeNotLeader` → `AdoptedBlock`), and on the Leios side `Consensus.LeiosKernel.BlockForged`, `BlockAnnounced`, `Voted` / `NotVoted`, `VoteScheduled`, `BlockCertified`. `NotVoted` is the one to watch: it is how you learn you hold a seat but are failing a vote condition.
 
+Operational findings and trace analyses are recorded append-only in the [Musashi observations and analyses log](./observations.md). Put conclusions there with the capture hash, node version, evidence, and telemetry limitations rather than leaving them only in terminal output or conversation history.
+
 **No restart is needed when the stake goes live.** The credentials were read at startup; what changes at the snapshot is the *ledger's* view, which the node learns by applying blocks. Forging is a per-slot leadership check against that state, and the Leios seat is looked up per vote attempt — `(getLeiosCommittee ls >>= getLeiosSeatId vk) ?>= NotOnCommittee` ([`LeiosVoting.hs:341`](https://github.com/IntersectMBO/ouroboros-consensus/blob/b56977baae0740f563060a8a9171c78be865b357/ouroboros-consensus/src/ouroboros-consensus/LeiosVoting.hs#L341)), with `vk` derived from the loaded signing key — so nothing is cached across the boundary. Until you are seated, expect `NotVoted` with reason **`NotOnCommittee`**; afterwards it simply starts voting. A restart is only needed when the *node's own* inputs change: new keys or op-cert, or an edited `config.json`.
 
 **Timing.** Stake delegated in epoch *N* is active at the start of *N+2*; musashi epochs are 21,600 slots at 1 s, so **6 hours each**. A submission at an arbitrary point in epoch *N* therefore waits 6–12 hours, and committee seating occurs on the same snapshot boundary, since [the committee is taken from the stake distribution](../artifacts/leios-node-protocol-parameters.md) carrying whichever BLS keys are registered.
@@ -349,7 +353,27 @@ The 500 ₳ deposit and the 2 ₳ stake-key deposit are charged again — new ch
 
 Finally, update [§ 0](#0-this-deployment) with the new epoch and dates, and check whether the respin moved any Leios parameter: `pin-config.sh` prints the periods, committee size, quorum, and derived certification gap on every run, so a diff of that output against this document is the cheapest parameter check there is.
 
-## 8. What a single node costs you
+## 8. Block-production statistics
+
+[`analyze-block-production.py`](./analyze-block-production.py) counts `TraceForgedBlock` events by epoch and compares the complete-epoch counts with the Praos expectation. Always give it an explicit inclusive epoch range: this prevents the current partial epoch from being mistaken for a low-production complete epoch. Include every rotated log covering that range; the script deduplicates repeated forged-block records by slot and block hash and checks that the logs contain one `TraceStartLeadershipCheck` for every slot in each requested epoch. A warning may mean missing logs, node downtime, or dropped trace messages; distinguish those cases before interpreting a low block count as leader-election evidence.
+
+The expected rate is not simply active stake share times the number of active slots. For stake fraction $\sigma$, active-slot coefficient $f$, and epoch length $L$, it is $L[1-(1-f)^\sigma]$. The script derives this from the pinned Shelley genesis when given the pool and total active stake:
+
+```shell
+python ./analyze-block-production.py \
+  --log musashi-bp.log.gz --first-epoch 64 --last-epoch 65 \
+  --stake 1009497788035 --total-active-stake 367948233779128
+```
+
+Stake and total active stake are snapshot-dependent. Re-query and record both rather than reusing the example numbers after an epoch or network respin. If the expected rate is already known, pass `--expected-rate 3.0395` instead. For a durable record independent of node-log retention, provide a CSV with `epoch,blocks` columns and the rate on the command line, or an `expected_rate` third column when the expectation varies by epoch:
+
+```shell
+python ./analyze-block-production.py --counts block-counts.csv --expected-rate 3.0395
+```
+
+The exact slot-level count model is binomial, but at approximately three successes in 21,600 trials per epoch its Poisson approximation is effectively indistinguishable for this diagnostic. The script reports three related quantities. The exact Poisson interval and exact two-sided test assess whether the aggregate production *rate* agrees with the stated expectation. A parametric-bootstrap Pearson discrepancy compares the full sequence with the fixed expected rates. A second Monte Carlo Pearson test conditions on the observed total, so it detects unusual epoch-to-epoch clustering without treating a high or low total as dispersion. This simulation-based treatment remains valid with sparse cells, unlike the usual asymptotic chi-squared histogram test. It does not repair a small sample: until tens of complete epochs have accumulated, the interval will be wide and the tests primarily descriptive.
+
+## 9. What a single node costs you
 
 Honest list, since you asked for this shape deliberately:
 
