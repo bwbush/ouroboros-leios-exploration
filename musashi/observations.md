@@ -265,3 +265,31 @@ Amaru's existing Praos/ledger architecture is nevertheless useful counterevidenc
 The comparison rejects the strong form of the hypothesis. All three codebases use concurrency for independent protocol work, and both implemented ledgers examined here serialize transaction state changes. Go Dingo demonstrates more aggressive fetch concurrency but does not yet perform the closure validity work required before a sound vote. Rust Amaru demonstrates that a purity-oriented stage architecture can explicitly exploit data parallelism, but it has not implemented Leios and keeps its ordinary transaction sequence serial.
 
 The Haskell prototype's specific decision to wait for the entire closure and then validate it inside the four-second voting window is a remediable prototype architecture choice. The lack of antichain ledger application is a deeper cross-language design gap: implementing it safely requires consensus-defined ordering semantics, complete read/write sets spanning UTxO and non-UTxO state, deterministic conflict handling and commit, reusable validation evidence, and resource bounds. Changing languages or replacing `foldM` with parallel syntax does not supply those properties.
+
+## 2026-09-24
+
+### Block-producer health is good, while fresh Leios traffic has stopped
+
+**Layer:** deployed Musashi node telemetry. **Capture:** [`musashi-bp.log.gz`](./musashi-bp.log.gz), 39,984,816 bytes, SHA-256 `ea034eca903984b0e9f65b3ac128ee2ebcb0c2d103bb08a983e6662065db81d3`, covering 2026-09-22 13:29:59.581 UTC through 2026-09-24 10:23:52.002 UTC. The capture contains one process startup and no restart. The configured image remains `prototype-2026w36`; the source pin used for trace interpretation remains `ouroboros-consensus@b56977b`.
+
+#### Ranking-block production
+
+📊 **EVIDENCE:** The producer performed exactly 21,600 consecutive leadership checks, with no slot gap, in each complete epoch 64 through 68. The observed block counts were 0, 4, 2, 3, and 5, totaling 14. Using the recorded stake snapshot and active-slot coefficient gives an expectation of 3.0395 blocks per epoch, or 15.1975 across the five epochs. The observed-to-expected ratio is 0.9212; its exact 95% confidence interval is [0.5036, 1.5456], and the exact two-sided Poisson rate-test p-value is 0.8911. The fixed-rate and total-conditioned Monte Carlo dispersion tests give p = 0.4011 and p = 0.3082. These data show no production-rate anomaly, but five epochs remain too few for a sensitive test. Epoch 69 was partial at capture end and had produced one additional block, so it is excluded from the rate test.
+
+Every one of the 15 `NodeIsLeader` events in the capture was followed by `ForgedBlock` and `AdoptedBlock` for the same slot and hash. Time from leader detection to forge ranged from 0.365 to 3.530 ms, with a 1.439 ms median; time to local adoption ranged from 5.897 to 53.614 ms, with a 31.785 ms median. There is no `CannotForge`, KES failure, invalid-block, or ledger-validation error. The node continued adding chain blocks through 10:22:46 UTC, one minute before its final leadership check. Peer churn produced 462 error-severity status-change or monitoring events over approximately 45 hours, but these did not interrupt leadership checking, chain growth, or successful local adoption.
+
+Reproduce the complete-epoch rate analysis with:
+
+```shell
+python3 ./analyze-block-production.py --log musashi-bp.log.gz --first-epoch 64 --last-epoch 68 --stake 1009497788035 --total-active-stake 367948233779128 --simulations 200000 --seed 20260924
+```
+
+The stake values are the recorded snapshot used in the earlier analysis. Re-querying the current snapshot would be necessary before treating 3.0395 as the expectation for later epochs.
+
+#### Leios voting is no longer receiving current work
+
+📊 **EVIDENCE:** The last fresh accepted Endorser Block (EB) announcement was for slot 1,393,469 at 2026-09-23 03:04:29.659 UTC. Its closure was acquired, validated, and voted by 03:04:32.744, and the associated vote/certificate traffic ended seconds later. The log contains no later `AnnouncementAccepted`, `BlockTxsAcquired`, `VoteScheduled`, `EbValidated`, or `Voted` event. Consequently, the expanded capture adds no new sample to the earlier 270 votes and 28 eligible-period `tooLate` outcomes, and it cannot show whether the previous `tooLate` rate improved or worsened.
+
+LeiosNotify did not become entirely silent. In epochs 65, 66, 68, and partial 69, the node received 289 announcements whose EB slots ranged from 467,154 to 1,335,015, all far behind the contemporaneous chain slots of 1,404,000 or later; none was accepted. These appear to be historical announcements from lagging or previous-incarnation peers rather than current Leios work. At the same time, transaction load collapsed from 297,041 mempool-add events in epoch 64 to 1,200, 1,015, 1,024, and 49 in epochs 65–68. That correlation is consistent with the network load generator or current EB producers stopping, but this single receiver does not establish the cause.
+
+❓🤖 **SCRUTINY:** The node is healthy as a Praos ranking-block producer, and its production count agrees with the recorded stake expectation. Its present Leios voting performance is unknown because fresh Leios inputs stopped more than 31 hours before capture end. The absence of accepted current announcements is evidence about what reached this node, not proof of a network-wide outage or a fault in any particular producer. A second current node trace or public explorer history would distinguish a network/workload cessation from an isolated topology problem. This environment could not query the live pod directly because rootless Podman namespace setup was denied, so the assessment ends at the capture timestamp rather than asserting current process liveness after 10:23:52 UTC.
