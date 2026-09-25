@@ -23,6 +23,8 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 | How do I collect data on transaction flow — push, pull, mempool, cache — from a running node? | [Collecting transaction-flow data](./artifacts/leios-tx-flow-instrumentation.md) — namespace map, config patch, jq recipes |
 | What tools exist for working with a running Leios node — CLI, load generators, local devnets, offline analysis? | [Tooling for a running Leios node](./artifacts/leios-node-tooling.md) — verified by running the image's own binaries |
 | How do I run a node on the musashi testnet myself? | [musashi/cheatsheet.md](./musashi/cheatsheet.md) — a podman relay, with the config-pinning and image-week traps that stop it syncing |
+| What mempool and cache issues and hypotheses are still open on the team? | [Open mempool and cache issues](./artifacts/leios-mempool-cache-open-issues.md) — a #team-leios snapshot: the relay-stall/cache-staleness bug, the fragmentation-bound and bistability debates, backend/GC, cross-referenced to our records |
+| Which research-sized mempool tasks could answer the team's plausibility question? | [Mempool plausibility workstream candidates](./artifacts/mempool-plausibility-workstream-candidates.md) — semi-centralized ingress, resource-bounded attacks, and a transaction-availability-service sub-study |
 | How do the kleioscan chain metrics, the node's telemetry funnel, and the models' alignment quantities line up? | [Mempool-alignment metric mapping](./artifacts/leios-mempool-metrics-mapping.md) |
 | What does a Leios term or parameter mean? | [Leios cheatsheet](./artifacts/leios-cheatsheet.md) — written for a new team member on day one |
 | What have we actually confirmed, with a date and a source? | [facts.md](./facts.md) |
