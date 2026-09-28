@@ -304,3 +304,57 @@ Two corrections to the entry above follow from that thread:
 
 1. **The stale post-cutoff announcements (EB slots 467,154–1,335,015) are from lagging / re-syncing peers, not "previous-incarnation" peers.** The thread reports a peer (PIR0) rebuilt after a database wipeout and re-syncing while hanging, and a block producer "very slow to catch up to tip." No network respin or new chain incarnation is mentioned anywhere; the network magic and this node's chain instance are unchanged. Read the earlier phrase "lagging or previous-incarnation peers" as **lagging / re-syncing peers** only.
 2. **The cause is network-side, not isolated to this node — but it is at least two concurrent factors, not one.** The thread documents both a load-generator outage (explaining the transaction collapse and the proximate EB cutoff) and block-producer catch-up / chain-selection degradation (the likely reason Leios did not resume when some transactions briefly returned around 22:00 UTC 2026-09-23). The `❓🤖 SCRUTINY` note above — that one receiver cannot establish the cause — stands; the Slack thread is operator testimony that corroborates a network/workload-side cause but is not a substitute for a second node's telemetry or explorer history, which remain the way to confirm whether any certified EBs were produced network-wide after the cutoff.
+
+## 2026-09-28
+
+### Final producer capture after pool retirement
+
+**Layer:** deployed Musashi node telemetry, the locally prepared signed retirement transaction, and the w36-pinned Dijkstra ledger implementation. **Capture:** [`musashi-bp.log.gz`](./musashi-bp.log.gz), 121,308,985 bytes, SHA-256 `f9f82c1531a5c1660253f31909374eec1451b9152f74c6ec3e64e1b811e979d2`, covering 2026-09-26 14:21:49.824 UTC through 2026-09-28 00:24:44.364 UTC. The gitignored capture contains 5,013,035 lines, of which 712 are not parseable as complete JSON trace records. The implementation sources used below are `cardano-ledger@1587f21` and `ouroboros-consensus@b56977b`.
+
+#### Retirement evidence and current operating state
+
+The prepared transaction retires pool `88610017a37cfcbf497127b1be43efd71376bd52f3bb8773b3dcf838` in epoch 84. Its decoded body contains one matching pool-retirement certificate, a fee of 180,461 lovelace, a 9,497,607,574-lovelace change output, and two witnesses; its transaction identifier is `27454fa267ecc3600a1eb13743c19051bbf443f70d9fbeffd062c5d55c167444`, matching the local retirement manifest. This establishes that the artifact was constructed correctly, not that the network accepted it.
+
+Epoch 84 began at 2026-09-28 00:00 UTC. The node remained live for another 24 minutes and 44 seconds, performing 1,485 leadership checks and continuing Leios voting, but did not forge a block in that short interval. Its last locally forged Ranking Block (RB) was at 2026-09-27 23:40:57 UTC, slot 1,813,257, before the retirement boundary. At 00:24:44 UTC the node drained its connections and emitted both `ChainDB.ImmDbEvent.DBClosed` and `ChainDB.OpenEvent.ClosedDB`; no fatal database or ledger error accompanies the shutdown. The producer is deliberately being left stopped and retired. A future restart is possible, but it must be treated as a new operational activation rather than merely starting this retired configuration.
+
+The trace contains neither the retirement transaction identifier nor a pool-reaping event, so it does **not** independently establish submission, on-chain inclusion, removal of the registration and delegations, or repayment of the 500 ada pool deposit. Those facts require a synchronized-node query. Before relying on the retirement state, query the pool registration, stake-address delegation and rewards, and the transaction's change output. The absence of the spent input and presence of `27454fa267ecc3600a1eb13743c19051bbf443f70d9fbeffd062c5d55c167444#0` would independently confirm transaction inclusion.
+
+#### Correction: retirement remains active for the retirement epoch, not two further epochs
+
+⚠️ **Correction to the 2026-09-28 conversational review:** that review initially said the active snapshot could retain the pool through epoch 85 and first exclude it in epoch 86. That was based on the Shelley transition order and is wrong for the deployed Dijkstra era. Dijkstra's [`EPOCH` transition](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/dijkstra/impl/src/Cardano/Ledger/Dijkstra/Rules/Epoch.hs) runs `POOLREAP` before `SNAP`. Its [`SNAP` rule](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/dijkstra/impl/src/Cardano/Ledger/Dijkstra/Rules/Snap.hs) creates the fresh mark after the retired pool and its delegations have been removed, then rotates the preceding mark into the active stake set.
+
+Consequently, the earlier snapshot can legitimately keep the pool eligible for Praos leadership and Leios committee voting during retirement epoch 84. That explains why voting continued after midnight and is not evidence that retirement failed. The fresh post-reaping snapshot should become active in epoch 85, beginning 2026-09-28 06:00 UTC, and exclude the retired pool. Because the node stopped in epoch 84, the capture does not empirically test its epoch-85 eligibility.
+
+#### Ranking-block production remained statistically ordinary
+
+📊 **EVIDENCE:** Complete epochs 80 through 83 produced 4, 1, 2, and 2 local blocks, respectively: 9 observed against 12.158 expected from the previously recorded 3.0395-block-per-epoch rate. The observed-to-expected ratio is 0.7403, with an exact 95% confidence interval of [0.3385, 1.4052] and an exact two-sided Poisson p-value of 0.4577. The fixed-rate and total-conditioned Pearson Monte Carlo tests give p = 0.6471 and p = 0.6564. Four epochs are not diagnostically powerful, but this sample shows no block-production anomaly.
+
+The producer emitted 86,380 of 86,400 expected leadership checks across those epochs. The 20 missing trace slots are 0.0231% of the total, and the longest consecutive gap is two slots. This is compatible with minor scheduling delay or trace loss and provides no evidence of sustained downtime.
+
+Reproduce the rate calculation with:
+
+```shell
+python3 ./analyze-block-production.py --log musashi-bp.log.gz --first-epoch 80 --last-epoch 83 --expected-rate 3.0395 --simulations 200000 --seed 20260928
+```
+
+The expected rate reuses an earlier recorded active-stake snapshot; it was not re-queried for these epochs. Treat the comparison as conditional on that rate rather than as a fresh measurement of the pool's expected stake share.
+
+#### Sustained transaction traffic restored the voting-latency failure
+
+| Epoch | Scheduled closures | Voted | `tooLate` | `chainTipDoesNotAnnounce` |
+|---:|---:|---:|---:|---:|
+| 80 | 442 | 292 (66.1%) | 115 (26.0%) | 35 (7.9%) |
+| 81 | 504 | 276 (54.8%) | 196 (38.9%) | 32 (6.3%) |
+| 82 | 530 | 272 (51.3%) | 210 (39.6%) | 48 (9.1%) |
+| 83 | 546 | 267 (48.9%) | 238 (43.6%) | 41 (7.5%) |
+| 84, first 24m44s | 63 | 37 (58.7%) | 23 (36.5%) | 3 (4.8%) |
+
+📊 **EVIDENCE:** Transaction load had returned: complete epochs 80–83 accepted 396,179, 449,939, 448,537, and 468,591 transactions, with observed mempool populations reaching roughly 7,200–8,000 transactions. Over the same period, `tooLate` rose from 26.0% to 43.6% of scheduled closures. Successful closure validations had median observed elapsed times of approximately 4.0–4.6 seconds and generally reapplied about 2,000 previously validated transactions. Among late closures that emitted `EbValidated`, median elapsed time was approximately 9.6–10.0 seconds in complete epochs, with maxima of about 20–23 seconds; these closures commonly required roughly 1,400–1,700 full transaction applications. Another 23, 31, 47, and 44 late closures in epochs 80–83 emitted no `EbValidated`, consistent with lateness before validation or secondary head-of-line delay.
+
+❓🤖 **SCRUTINY:** The local evidence continues to support the previously recorded mechanism: cache-warm closures often finish within the four-second voting window, while cache-cold closures that need many full transaction applications commonly do not, and the serial voting worker creates secondary queueing failures. This is an observational association from one producer, not a controlled causal decomposition. The trace still cannot separate transaction-fetch time, ledger-validation CPU time, runtime scheduling, storage latency, and closure composition transaction by transaction.
+
+#### Remaining operational signals
+
+All 2,658 warning-severity records are the already-known `LeiosBlockPointMissing` acquisition marker. Error-severity records consist of peer-status, handshake, deactivation, keepalive, bearer, and shutdown-related churn. The capture contains no `InvalidBlock`, `CannotForge`, critical chain-synchronization failure, database corruption, or fatal ledger error. Subject to the trace's 712 malformed lines, the supported conclusion is that the node remained healthy as a Ranking Block producer until its orderly shutdown; its persistent problem was timely Leios voting under transaction load.
+
+If the pool is activated again on this same chain, first confirm that the network has not respun, re-register the retired pool, fund any renewed deposits, restore the intended delegation, wait for activation snapshots, verify the current configuration and required image, and check both the Key Evolving Signature (KES) operational certificate and Boneh–Lynn–Shacham (BLS) voting-key age. Do not infer readiness from the old database or credentials alone. If the network has respun, follow the new-chain procedure in the [block-producer runbook](./block-producer.md#7-when-the-network-is-respun).
