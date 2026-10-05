@@ -8,7 +8,7 @@
 # (BLS key generation, pool registration with a Leios voting key, the
 # `dijkstra query *` family) and `tx-firehose` + `mempool-monitor` for the
 # mempool-fragmentation instrumentation described in
-# artifacts/leios-tx-flow-instrumentation.md.
+# arc-leios-ha/background/pre-scoping/leios-tx-flow-instrumentation.md.
 #
 # MATCH THE WEEK TO THE NETWORK. `version` below must track the musashi
 # environment's `MinNodeVersion`; a newer build silently diverges from the

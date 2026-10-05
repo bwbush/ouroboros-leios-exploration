@@ -270,7 +270,7 @@ If no archival material exists for the subject, the appendix is one paragraph do
 
 8. **American English spelling** throughout.
 
-9. **Protocol cheatsheet**: After creating the deep dive, update [`artifacts/leios-cheatsheet.md`](../../../artifacts/leios-cheatsheet.md) with any newly covered protocols or mechanisms. Each entry needs at least one source link.
+9. **Protocol cheatsheet**: After creating the deep dive, update [`arc-leios-ha/background/pre-scoping/leios-cheatsheet.md`](../../../arc-leios-ha/background/pre-scoping/leios-cheatsheet.md) with any newly covered protocols or mechanisms. Each entry needs at least one source link.
 
 10. **Journal entry**: After creating the deep dive, add a reverse-chronological journal entry in the current phase logbook under `journal/` (e.g., `journal/phase-0.md`). Inspect the directory to find the active file; the entry goes as the first H3 under today's H2 section, and carries the same provenance marker as the deep dive itself.
 

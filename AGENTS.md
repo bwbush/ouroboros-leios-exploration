@@ -8,19 +8,23 @@ This repository is a **research-and-development exploration workspace**, not a p
 
 > [!IMPORTANT]
 >
-> **Current phase: scope discovery.** As of 2026-09-16 this effort has no fixed workplan. The objectives below are provisional and the repository blueprint describes directories that are created on first use rather than ones that already exist. Treat every scope statement in this document as a hypothesis to be confirmed, narrowed, or discarded — and update this file when it is.
+> **Current direction: initial experiment planning.** On 2026-10-05, Brian and Will agreed to pursue incremental memory-pool and transaction-cache experiments on the Musashi Dojo testnet, supporting the Leios high-confidence workstream (HCW). Shared work belongs in [arc-leios-ha](https://github.com/input-output-hk/arc-leios-ha), checked out locally as a top-level submodule. The [agreed plan](arc-leios-ha/experiment-plan.md) supersedes earlier provisional scope suggestions where they differ; it is not a fixed multi-month epic. This repository remains the exploration notebook and troubleshooting record.
 
 ## 🎯 Mission Objectives
 
-### Phase 0 — Scope discovery (current)
+### Phase 0 — Scope discovery foundation
 
 1. **Primary goal:** Determine what this effort should actually be. Enumerate the open questions about [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios) that are (a) worth answering, (b) answerable with the resources available here, and (c) not already answered by the upstream Leios team. The deliverable is a written scope statement with candidate workstreams, each sized and ranked.
 2. **Secondary goal:** Establish a working environment. Get the upstream Leios artifacts — simulators, formal specifications, trace tooling, analysis scripts — building and running locally, and record what that took. A dead end that is documented is a result; an undocumented one will be paid for twice.
 3. **Tertiary goal:** Build the team's shared mental model of Leios: its block classes and their roles, its diffusion and voting mechanics, its parameter space, and the failure modes that distinguish it from Praos.
 
-### Phase 1 and beyond — To be defined
+### Agreed next increment — Musashi Dojo experiments
 
-Scope, staffing, and deliverables follow from the Phase-0 scope statement. Do not assume a phase structure beyond Phase 0 until that document exists.
+Brian and Will will record honest and adversarial experiment ideas as issues in the shared repository, classify their infrastructure requirements, and group runs to reuse deployments. They also plan a large language model (LLM) meta-experiment exploring memory-pool and transaction-cache performance; its objective and execution controls remain to be designed. Game-theoretic experiments are postponed. No individual experiment or execution schedule has yet been selected by this agreement.
+
+**Testnet authorization — recorded 2026-10-05 from Brian's report.** Sebastian, who leads the Leios engineering effort, has confirmed that Brian and Will may obtain as much test ADA as needed and are fully authorized to use the Musashi Dojo testnet for this work, including adversarial experiments that disrupt or break that network. Disruption of this designated testnet is an authorized experimental outcome, not by itself a reason to reject a proposed experiment. This authorization does not extend to mainnet, other networks, unrelated infrastructure, or spending beyond the approved budget. Record the target network identity and run configuration before execution so that the authorization is applied to the intended network. This planning record does not itself start a run or reactivate the retired pool.
+
+**Cloud budget — recorded 2026-10-05 from Brian's report.** David has allocated USD 2,000 for Amazon Web Services (AWS) infrastructure; check in with him when cumulative spending reaches USD 1,500. Count compute, storage, data transfer, addresses, and supporting services, not just node instance charges. The [plan's node-hour estimates](arc-leios-ha/experiment-plan.md#aws-planning-estimate) are conditional planning arithmetic, not a spend commitment or a validated node-sizing recommendation.
 
 ### Standing charter — troubleshooting
 
@@ -38,8 +42,8 @@ Independently of phase, this repository is the home for **R&D-level troubleshoot
 ### Hard constraints
 
 - **No authority over upstream.** This repository does not own the Leios specification or its reference implementations. Proposed changes go upstream through normal review; nothing here is a decision of record for the protocol.
-- **Public-by-default protocol, private-by-exception materials.** Leios is developed in the open. Anything placed in `background/` is the exception and is treated as private/proprietary — see the blueprint below.
-- **Small-scale compute by default.** Assume a single workstation unless a cloud budget is explicitly approved. Where a question genuinely requires a geographically distributed multi-node testbed, say so explicitly in the experiment's `design-history.md` rather than substituting a single-machine run and reporting it as if it answered the question. Single-machine "large network" runs measure CPU and scheduler contention, not network consensus behavior.
+- **Public-by-default protocol, private-by-exception materials.** Leios is developed in the open. Anything placed in this parent repository's `background/` is the exception and is treated as private/proprietary — see the blueprint below. The shared repository's `background/pre-scoping/` is a separate collection of explicitly transferred work products, not a transfer of the parent's private reference materials.
+- **Small-scale compute by default.** Assume a single workstation outside the explicitly approved Musashi Dojo AWS budget above. Where a question genuinely requires a geographically distributed multi-node testbed, say so explicitly in the experiment's `design-history.md` rather than substituting a single-machine run and reporting it as if it answered the question. Single-machine "large network" runs measure CPU and scheduler contention, not network consensus behavior.
 - **Simulation results are not deployment claims.** Never present simulator output as a statement about mainnet behavior without naming the modeling assumptions that carry the inference.
 
 ### Additional requirements and considerations
@@ -62,10 +66,11 @@ Leios has an Agda specification lineage upstream, and the properties at issue �
 | Person | Role | Responsibility |
 |--------|------|----------------|
 | Brian W. Bush (`bwbush`) | Everything | Scope discovery, upstream-artifact survey, experiments and troubleshooting, assessments, and the repository itself |
+| Will Wolff | Shared experiment work | Joint planning and execution with Brian in `arc-leios-ha`, as agreed 2026-10-05 |
 
-One person holds every role as of 2026-09-16. Two consequences worth stating rather than leaving implicit:
+Brian maintains this exploration notebook; Brian and Will now collaborate in the shared repository. Two documentation expectations remain:
 
-- **No reviewer.** Nothing here gets a second pair of human eyes by default, so the written record has to carry the scrutiny a reviewer would otherwise provide. That is what the ❓ / ❓🤖 **SCRUTINY** markers, the `facts.md` sourcing discipline, and the append-only experiment logs are for. Use them on your own work, not only on someone else's.
+- **No assumed review.** Collaboration does not establish that any particular artifact has received independent review. The written record must carry explicit scrutiny: use the ❓ / ❓🤖 **SCRUTINY** markers, the `facts.md` sourcing discipline, and append-only experiment logs on your own work, not only on someone else's.
 - **Write for the next person, not for today.** Every document should read as though handed to a colleague who has not been in any of the conversations — see the document-class reader table in [`.claude/skills/reader-audit/SKILL.md`](.claude/skills/reader-audit/SKILL.md). Single-author repositories decay into private notation faster than shared ones.
 
 The roles this effort is expected to draw on if and when it is staffed further: researcher (literature and upstream-artifact survey, protocol analysis, knowledge-base curation), prototyper (simulation runs, trace analysis, benchmark harnesses, troubleshooting reproductions), formal-methods engineer (specification reading and mechanization, safety and liveness analysis), and network engineer (diffusion and propagation measurement, topology modeling, bandwidth accounting).
@@ -82,8 +87,8 @@ Verified facts established through this effort are maintained in [`facts.md`](./
 
 Directories are created on first use; in the scope-discovery phase most of this is a target layout rather than a current one.
 
-- `/artifacts/`: Miscellaneous notes and work products — slide decks, diagrams, briefs, synthesis documents.
-- `/assessments/`: Technical deep-dives into Leios and comparable protocols, and into their applicability to Cardano. Every assessment must include a `## Sources` section at the end with entries in `[Title — Publisher/Context](URL)` format; use `Title — Publisher/Context (internal)` for internal documents without public URLs. Split the sources section into named subsections (e.g., `### General Sources`, `### Protocol Sources`, `### Cardano Sources`) when the source base spans multiple distinct domains.
+- `/arc-leios-ha/`: Local submodule checkout of Brian and Will's [shared work repository](https://github.com/input-output-hk/arc-leios-ha). This is an authored work repository, not a vendored upstream implementation; its own documents and code belong there directly. See the [initial experiment plan](arc-leios-ha/experiment-plan.md). Do not transfer private `background/` material merely because this checkout is local.
+- `/arc-leios-ha/background/pre-scoping/`: The former `artifacts/` and `assessments/` collections, consolidated on 2026-10-05: notes, diagrams, briefs, synthesis documents, and technical assessments. The simulation catalog retains its supporting subdirectory. Rendered PNG previews remain gitignored. Every assessment, regardless of location, must include a `## Sources` section at the end with entries in `[Title — Publisher/Context](URL)` format; use `Title — Publisher/Context (internal)` for internal documents without public URLs. Split the sources section into named subsections (e.g., `### General Sources`, `### Protocol Sources`, `### Cardano Sources`) when the source base spans multiple distinct domains.
 
   **Quality-assessment Afterword:** Only add an `## Afterword: Quality Scrutiny` section when explicitly asked to do so. When asked, append it after all existing content and structure it as five subsections:
   1. **Sources correspond to retrievable URLs** — attempt to fetch each cited URL; note which are accessible, which redirect, and which are unreachable.
@@ -151,13 +156,15 @@ Provenance markers for journal entries and documents:
 
 The provenance marker on an assessment document is propagated to its journal summary entry.
 
-**Protocol cheatsheet.** `artifacts/leios-cheatsheet.md` is a living reference document, first populated on 2026-09-17 (Leios mechanisms and the protocol-parameter set; the Ouroboros-family, comparators, and baselines sections are still stubs). Update it whenever a Leios mechanism, block class, parameter, or comparable protocol is newly discussed or explored more deeply — including anything mentioned in an assessment, journal entry, or brainstorming document. Each entry must include at least one source link. It is intended as an onboarding resource for new team members, so descriptions should be objective and self-contained.
+**Protocol cheatsheet.** `arc-leios-ha/background/pre-scoping/leios-cheatsheet.md` is a living reference document, first populated on 2026-09-17 (Leios mechanisms and the protocol-parameter set; the Ouroboros-family, comparators, and baselines sections are still stubs). Update it whenever a Leios mechanism, block class, parameter, or comparable protocol is newly discussed or explored more deeply — including anything mentioned in an assessment, journal entry, or brainstorming document. Each entry must include at least one source link. It is intended as an onboarding resource for new team members, so descriptions should be objective and self-contained.
 
 **Vendored submodules and patches.** If upstream Leios repositories are vendored as git submodules, modifications are **not** committed inside the submodule. They live as tracked `.patch` files re-applied on build, with the patch files — plus the experiment's `Makefile` — as the reproducible source of truth: a submodule reset or a fresh clone must reconstruct the tree from the patches alone. Therefore, whenever you edit a vendored submodule in place, regenerate the corresponding patch in the same change and commit it. Verify patch currency non-destructively with `git apply --reverse --check <patch>` before relying on a patch set, and wire every patch into the experiment's `make patches` target — an unapplied patch silently has no effect. Where a submodule is shared by more than one experiment, each experiment owns a disjoint patch set and all of them must be accounted for on any reset or re-apply.
 
+The authored `arc-leios-ha` work repository is not subject to this vendored-code restriction. Changes belong directly in that repository; committing them and advancing the parent gitlink remain separate Git operations and require the usual user direction.
+
 ## ⏳ Timeline
 
-To be determined. The scope-discovery phase has no committed end date. Its one fixed point as of 2026-09-17 is the **scope brainstorm scheduled for 2026-09-21**; the Phase-0 scope statement follows that meeting rather than preceding it.
+The initial shared experiment direction was agreed on **2026-10-05 (Mountain Daylight Time)**. Work proceeds incrementally through experiment ideas and selected tickets rather than a predefined multi-month epic. No run dates or fixed completion date have been committed.
 
 ## 🤖 Persona & Analysis Instructions
 

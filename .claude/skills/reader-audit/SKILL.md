@@ -27,14 +27,14 @@ This table is the canonical reader definition for this repository. The sibling p
 
 | Class | Path | Reader | Context budget |
 |-------|------|--------|----------------|
-| Assessment / deep dive | `assessments/` | A blockchain or distributed-systems engineer who does **not** work on Leios | Assumes general distributed-systems and consensus vocabulary (BFT, quorum, VRF, Merkle tree, longest-chain vs. BFT finality). Assumes **no** Leios terms of art and **no** prior document from this repository. |
-| Synthesis artifact / brief / explainer | `artifacts/` | A general technical reader deciding something | Expands everything domain-specific, including the Leios block-class abbreviations. Decision-oriented. |
-| Protocol cheatsheet | `artifacts/leios-cheatsheet.md` | A new team member on day one | Every entry self-contained and objective, with at least one source link. Zero assumed prior reading. |
+| Assessment / deep dive | `arc-leios-ha/background/pre-scoping/` (formerly `assessments/`) | A blockchain or distributed-systems engineer who does **not** work on Leios | Assumes general distributed-systems and consensus vocabulary (BFT, quorum, VRF, Merkle tree, longest-chain vs. BFT finality). Assumes **no** Leios terms of art and **no** prior document from this repository. |
+| Synthesis artifact / brief / explainer | `arc-leios-ha/background/pre-scoping/` (formerly `artifacts/`) | A general technical reader deciding something | Expands everything domain-specific, including the Leios block-class abbreviations. Decision-oriented. |
+| Protocol cheatsheet | `arc-leios-ha/background/pre-scoping/leios-cheatsheet.md` | A new team member on day one | Every entry self-contained and objective, with at least one source link. Zero assumed prior reading. |
 | Weekly report | `weekly-reports/` | A technical stakeholder who is not a Leios specialist | One-line gloss for anything Leios-specific; numbers with comparators. Readable without the journal. |
 | Formal-methods note | wherever filed | A formal-methods engineer | Assumes the notation (Agda, TLA+) and proof vocabulary; assumes **no** Leios mechanics. |
 | Journal / experiment log | `journal/`, `experiments/*/design-history.md`, `experiments/*/lessons-learned.md` | The core team | High context assumption is by design. Do not audit unless explicitly asked. |
 
-The key consequence: flag against the *persona's* assumed knowledge, not your own. For the assessment class's blockchain-engineer reader, do not flag "BFT" or "Merkle tree"; do flag Leios terms of art — the block-class abbreviations, stage and pipeline names, bare parameter symbols — and any result from another document in this repository that is cited as if the reader had read it. For the `artifacts/` general-technical reader, flag both.
+The key consequence: flag against the *persona's* assumed knowledge, not your own. For the assessment class's blockchain-engineer reader, do not flag "BFT" or "Merkle tree"; do flag Leios terms of art — the block-class abbreviations, stage and pipeline names, bare parameter symbols — and any result from another document in this repository that is cited as if the reader had read it. For the synthesis class's general-technical reader, flag both.
 
 ## Step 2: read once, tracking what you do not yet know
 

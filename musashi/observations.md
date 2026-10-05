@@ -50,7 +50,7 @@ The pinned implementation explains both classifications. `lHdrWait = 3 s` and `l
 
 The node as a whole is multithreaded: networking, chain selection, forging, mempool processing, fetching, and voting run concurrently. The relevant path is nevertheless serial in two narrower senses.
 
-First, `LeiosTxCache` is not a hardware CPU cache and “cold” does not mean that transaction bytes were absent from RAM. It is a trust-bearing index recording whether the node has already *validated* a transaction, either through its mempool or an earlier Leios voting pass. Possessing or fetching a transaction body proves only availability; it does not license a vote asserting that the whole closure is a valid extension of the announcing RB. On a cache hit, the implementation has an `assumeValidated` token and may call `reapplyTx`, skipping static validation while repeating the state-dependent checks. Without that validated tag it must call full `applyTx`; otherwise the node could sign a closure containing an invalid signature, script, value balance, input, or other ledger-rule failure merely because it received the bytes. The distinction and the construction of the trusted token are traced through the [transaction-cache analysis](../artifacts/leios-node-mempool-txcache.md).
+First, `LeiosTxCache` is not a hardware CPU cache and “cold” does not mean that transaction bytes were absent from RAM. It is a trust-bearing index recording whether the node has already *validated* a transaction, either through its mempool or an earlier Leios voting pass. Possessing or fetching a transaction body proves only availability; it does not license a vote asserting that the whole closure is a valid extension of the announcing RB. On a cache hit, the implementation has an `assumeValidated` token and may call `reapplyTx`, skipping static validation while repeating the state-dependent checks. Without that validated tag it must call full `applyTx`; otherwise the node could sign a closure containing an invalid signature, script, value balance, input, or other ledger-rule failure merely because it received the bytes. The distinction and the construction of the trusted token are traced through the [transaction-cache analysis](../arc-leios-ha/background/pre-scoping/leios-node-mempool-txcache.md).
 
 Second, applying a closure threads one evolving ledger state through the transactions in closure order. The pinned implementation's `goValidate` recursion applies or reapplies one transaction, obtains the next state, then processes the next transaction. Independent transactions could conceivably be prechecked or speculatively parallelized by a different implementation, but this implementation does not do so, and arbitrary Unspent Transaction Output (UTxO) dependencies prevent simply applying the entire ordered closure concurrently.
 
@@ -62,7 +62,7 @@ The nominal four-second budget follows directly from implementation order. A clo
 
 #### Relation to the protocol inequalities
 
-The directly implicated design inequality in the [protocol-parameter timing diagram](../artifacts/leios-timing-inequalities.svg) is
+The directly implicated design inequality in the [protocol-parameter timing diagram](../arc-leios-ha/background/pre-scoping/leios-timing-inequalities.svg) is
 
 $$3L_{\mathrm{hdr}} + L_{\mathrm{vote}} > \Delta_{\mathrm{EB}}^{O}.$$
 

@@ -99,11 +99,11 @@ The pinned `config.json` already sets `Consensus.LeiosKernel`, `Consensus.LeiosP
 | `LeiosBlockForged` / `LeiosBlockCertified` | EB production and certification — emitted by producers, so you see the effects here, not the events. |
 | `CertRBStaged` / `CertRBReleased` | A certificate-carrying ranking block (CertRB) parked because its EB closure wasn't local yet, and released when it arrived. |
 
-**To collect transaction-flow data** (push, pull, mempool, cache) you will need a config change first — the shipped config silences the whole tx-submission path. Namespace map, patch, and analysis recipes: [Collecting transaction-flow data](../artifacts/leios-tx-flow-instrumentation.md).
+**To collect transaction-flow data** (push, pull, mempool, cache) you will need a config change first — the shipped config silences the whole tx-submission path. Namespace map, patch, and analysis recipes: [Collecting transaction-flow data](../arc-leios-ha/background/pre-scoping/leios-tx-flow-instrumentation.md).
 
-**What else you can point at this node** — the `cardano-cli dijkstra` surface (including Boneh–Lynn–Shacham (BLS) key generation), the SQLite store you can query for EB overlap, `tx-firehose` and `mempool-monitor`, the local devnets, and where the observability gaps are: see [Tooling for a running Leios node](../artifacts/leios-node-tooling.md).
+**What else you can point at this node** — the `cardano-cli dijkstra` surface (including Boneh–Lynn–Shacham (BLS) key generation), the SQLite store you can query for EB overlap, `tx-firehose` and `mempool-monitor`, the local devnets, and where the observability gaps are: see [Tooling for a running Leios node](../arc-leios-ha/background/pre-scoping/leios-node-tooling.md).
 
-What the numbers mean — the certification gap, quorum, EB capacity limits, and which of them are actually enforced — is in [the protocol-parameter note](../artifacts/leios-node-protocol-parameters.md) and [the timing-inequalities timeline](../artifacts/leios-timing-inequalities.svg).
+What the numbers mean — the certification gap, quorum, EB capacity limits, and which of them are actually enforced — is in [the protocol-parameter note](../arc-leios-ha/background/pre-scoping/leios-node-protocol-parameters.md) and [the timing-inequalities timeline](../arc-leios-ha/background/pre-scoping/leios-timing-inequalities.svg).
 
 ## Building the CLI yourself
 
@@ -151,7 +151,7 @@ podman kube down musashi-relay.yaml
 podman kube play musashi-relay.yaml
 ```
 
-Config is read only at start, so a re-pin needs a restart. **If `systemStart` changed, the chain is a new instance and the old database is worthless** — remove `/data/musashi` after stopping the pod and before restarting. Diff `config/PINNED.txt` against the previous pin to see what moved; the hashes there are of the published bytes, so they compare directly with the ones recorded in [the parameter note](../artifacts/leios-node-protocol-parameters.md#sources).
+Config is read only at start, so a re-pin needs a restart. **If `systemStart` changed, the chain is a new instance and the old database is worthless** — remove `/data/musashi` after stopping the pod and before restarting. Diff `config/PINNED.txt` against the previous pin to see what moved; the hashes there are of the published bytes, so they compare directly with the ones recorded in [the parameter note](../arc-leios-ha/background/pre-scoping/leios-node-protocol-parameters.md#sources).
 
 A respin is more than a re-pin for a *producer*: the registration, stake, and KES clock all reset while the keys survive. The runbook is [block-producer.md § 7](./block-producer.md#7-when-the-network-is-respun).
 
@@ -168,7 +168,7 @@ A respin is more than a re-pin for a *producer*: the registration, stake, and KE
 
 1. **A Boneh–Lynn–Shacham (BLS) key.** `cardano-node` takes `--shelley-bls-key FILEPATH`, "Path to the BLS (Leios) signing key" ([`Parsers.hs:420`](https://github.com/IntersectMBO/cardano-node/blob/7e33674108ed17eeeda3a25e98b66a610cbd99ff/cardano-node/src/Cardano/Node/Parsers.hs#L420)), alongside the usual `--shelley-operational-certificate`, `--shelley-kes-key`, and `--shelley-vrf-key`.
 2. **Registration.** The BLS public key and its proof of possession travel on the **pool registration certificate**, not a separate transaction: `sppBlsKey :: StrictMaybe BlsKey` on `StakePoolParams`, where `BlsKey = { blsPubKey, blsPossessionProof }` over BLS12-381 min-sig ([`StakePool.hs:464`](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/libs/cardano-ledger-core/src/Cardano/Ledger/State/StakePool.hs#L464)). The ledger records the epoch of registration (`BlsKeyState`), and a key is honored only while `epoch < registeredIn + maxKeyAge` — **374 epochs** at musashi's KES settings, about 93 days at six-hour epochs.
-3. **A committee seat, which stake alone doesn't guarantee.** Seating is the top `N_c = 900` pools by stake; a seated pool with no registered BLS key is *keyless* — it occupies a seat and cannot vote, and any certificate bit set on it invalidates the certificate. Details in [the parameter note § 3](../artifacts/leios-node-protocol-parameters.md).
+3. **A committee seat, which stake alone doesn't guarantee.** Seating is the top `N_c = 900` pools by stake; a seated pool with no registered BLS key is *keyless* — it occupies a seat and cannot vote, and any certificate bit set on it invalidates the certificate. Details in [the parameter note § 3](../arc-leios-ha/background/pre-scoping/leios-node-protocol-parameters.md).
 4. **A different container command.** `/app/run-node.sh` takes no key flags, so a producer must override `command:` and mount a `./keys` volume — [`musashi-bp.yaml`](./musashi-bp.yaml) is that pod, ready to play.
 
 Musashi stake is self-service: after a pool registration is on chain, submit its bech32 pool identifier through the faucet's **delegate** widget. This deployment completed that sequence in epoch 62, became active in epoch 64, and retired in epoch 84. A future reactivation needs a new registration and delegation followed by the normal activation delay.
