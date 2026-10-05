@@ -1,0 +1,3 @@
+[submodule "arc-leios-ha"]
+	path = arc-leios-ha
+	url = https://github.com/input-output-hk/arc-leios-ha.git
