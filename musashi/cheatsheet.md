@@ -1,25 +1,26 @@
 # Running a musashi Leios node — cheatsheet
 
-**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation (`cardano-node@leios-prototype`) · **Verified:** 2026-09-22
+**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation (`cardano-node@leios-prototype`) · **Verified:** 2026-09-30
 
 > [!IMPORTANT]
-> **This deployment now runs a block producer, not a relay.** Pool **ΘΕΛΩ** (`THELO`, `pool13pssq9ar0n7t7jt3y7cmusl06ufhd02j7wacwuanmnursyyr7qu`) has been registered on chain since epoch 62, 2026-09-22, and the running pod is [`musashi-bp.yaml`](./musashi-bp.yaml) — container `musashi-bp-node`. This page still describes the **relay**, which is the right starting point for a new node and the thing to fall back to when debugging: everything in it applies to both, since the producer is the same pod plus credentials. For the producer specifics — keys, certificates, deposits, rotations, what a single-node setup costs — see [block-producer.md](./block-producer.md).
+> **This deployment is retired and intentionally stopped.** Pool **ΘΕΛΩ** (`THELO`, `pool13pssq9ar0n7t7jt3y7cmusl06ufhd02j7wacwuanmnursyyr7qu`) retired in epoch 84, beginning 2026-09-28 00:00 UTC. The public chain index reports zero stake and zero delegators from epoch 85. The files remain for analysis and possible later reactivation; do not start the producer pod without first following the re-registration and activation procedure in [block-producer.md](./block-producer.md#retire-the-pool).
 >
-> Container names follow the pod: `musashi-relay-node` under the relay spec, `musashi-bp-node` under the producer's. Examples below use the producer's.
+> Container names follow the pod: `musashi-relay-node` under the relay spec, `musashi-bp-node` under the producer's. Current generic-node examples use the relay; producer-specific examples are historical or conditional on reactivation.
 >
-> Its faucet delegation was submitted in epoch 62 and becomes active at the start of epoch **64**, 2026-09-23 00:00 UTC. That makes the pool eligible for leader selection; it does not guarantee a block-production slot.
+> The historical producer was active from epoch 64 until retirement epoch 84. It forged 57 lifetime Ranking Blocks according to the public chain index.
 
 > [!NOTE]
-> **What has actually been exercised**, as of 2026-09-22: `pin-config.sh`, the relay pod (run from 2026-09-21), the producer pod, both key scripts, the registration transaction, and the faucet delegation. The version-skew stall in Troubleshooting is a real incident, not a hypothetical. Still unexercised: the Key Evolving Signature (KES) rotation, re-pinning after the network is respun, and the `aarch64-linux` image. Facts about the image, config, and command-line interface (CLI) flags come from the published metadata, the live network config, or pinned source — the documents say which.
+> **What has actually been exercised**, as of 2026-09-30: `pin-config.sh`, the relay and producer pods, both key scripts, pool registration, delegation, block production, Leios voting, retirement-transaction construction and submission, and orderly shutdown. The version-skew stall in Troubleshooting is a real incident, not a hypothetical. Still unexercised: KES rotation, reactivation after retirement, re-pinning after a network respin, and the `aarch64-linux` image. Facts about the image, config, and command-line interface (CLI) flags come from published metadata, live network configuration, pinned source, or the dated [observations log](./observations.md).
 
 ## TL;DR
 
 ```shell
 cd musashi
-./pin-config.sh                       # fetch the live network config
-podman kube play musashi-bp.yaml      # start the deployed block producer
-podman logs -f musashi-bp-node        # watch it sync
-podman kube down musashi-bp.yaml      # stop and remove
+# No pod is intentionally running while the pool is retired.
+./pin-config.sh                          # fetch the live network config before any future run
+podman kube play musashi-relay.yaml      # optional non-producing observer only
+podman logs -f musashi-relay-node        # watch it sync
+podman kube down musashi-relay.yaml      # stop and remove
 ```
 
 ## What this gives you
@@ -33,10 +34,10 @@ The relay spec gives a **non-block-producing** node on `musashi` (the public Lei
 | `:3010` | Node-to-node, published on all interfaces. **The only port that needs to be public.** Inbound isn't needed to sync, but it is what makes this a relay. |
 | `127.0.0.1:12798` | Prometheus metrics, bound to loopback in the pod spec because the endpoint is unauthenticated (see the rebind note under [Step 1](#step-1--pin-the-live-network-configuration)). |
 
-The image is `ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet`, tag **`prototype-2026w36`**, digest-pinned in the YAML (multi-arch amd64/arm64, ~80 MiB compressed). Its `CMD` is `/app/run-node.sh`, which copies `/app/config` into `/data` and runs `cardano-node run` there.
+The image is `ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet`, currently tag **`prototype-2026w38a`**, digest-pinned in both YAML files to multi-architecture manifest `sha256:e9e501692d08f88ba372557a59d0c8189cb29f0416fea4e987dff046cad16227`. Its `CMD` is `/app/run-node.sh`, which copies `/app/config` into `/data` and runs `cardano-node run` there.
 
 > [!IMPORTANT]
-> **Match the image's week to the network, not to `main`.** `MinNodeVersion` is a floor, not a match: a newer weekly image passes it, starts, syncs for days — and then rejects a block the network accepted, because the prototype's ledger rules move between weeklies without a hard fork. The chain running since 2026-09-07 was deployed from **w36** (node rev `afa091b4`), and w38 carries a newer `cardano-ledger`. Pin the week the live config names.
+> **Match the image's week to the network, not to `main`.** `MinNodeVersion` is a floor, not a semantic compatibility guarantee: a mismatched weekly image can start, sync for days, and then reject a block the network accepted because prototype ledger rules move without a hard fork. This happened when a w38 node joined the then-w36 chain. The chain kept its 2026-09-07 genesis, but by 2026-09-30 its published configuration named **w38a**; both YAML files and the development shell now match that value. Recheck before every future start.
 
 ## Prerequisites
 
@@ -59,7 +60,7 @@ The script fetches the eight published files, validates them as JSON (so an HTML
   systemStart      2026-09-07T00:00:00Z   (chain instance)
   networkMagic     164
   slotLength       1 s, epoch 21600 slots, f = 0.05
-  MinNodeVersion   11.1.0.164-prototype-2026w36   (pin the image to THIS week)
+  MinNodeVersion   11.1.0.164-prototype-2026w38a  (pin the image to THIS week)
   Leios periods    L_hdr 1000 ms, L_vote 4000 ms, L_diff 7000 ms
   committee/quorum N_c = 900, tau = 0.75
   cert gap         ceil((3*L_hdr + L_vote + L_diff)/slot) = 14 slots
@@ -70,18 +71,18 @@ One local patch is applied by default: the published `config.json` binds the Pro
 ## Step 2 — start the pod
 
 ```shell
-podman kube play musashi-bp.yaml             # add --replace to recreate the deployed producer
+podman kube play musashi-relay.yaml          # add --replace to recreate a non-producing observer
 ```
 
-Run it **from this directory**: the producer YAML resolves the relative `./config` and `./keys` host volumes against the current directory. Its node data uses the explicit host path `/data/musashi`.
+Run it **from this directory**: the YAML resolves the relative `./config` host volume against the current directory. Node data uses the explicit host path `/data/musashi`.
 
-For a new non-producing node or when isolating a producer problem, use `podman kube play musashi-relay.yaml` instead. Do not run both specifications simultaneously: they share the data directory and host ports.
+[`musashi-bp.yaml`](./musashi-bp.yaml) additionally resolves `./keys` and loads production credentials. It is retained for a deliberate future reactivation, after pool re-registration, delegation, snapshot activation, and key checks. Do not run both specifications simultaneously: they share the data directory and host ports.
 
 ## Step 3 — confirm it is syncing
 
 ```shell
-podman logs -f musashi-bp-node              # or: tail -f /data/musashi/node.log
-podman exec musashi-bp-node cardano-cli query tip --testnet-magic 164
+podman logs -f musashi-relay-node              # or: tail -f /data/musashi/node.log
+podman exec musashi-relay-node cardano-cli query tip --testnet-magic 164
 curl -s localhost:12798/metrics | grep -i leios
 ```
 
@@ -106,13 +107,13 @@ What the numbers mean — the certification gap, quorum, EB capacity limits, and
 
 ## Building the CLI yourself
 
-**The repository's dev shell now provides it.** `nix develop` at the repo root puts `cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on `PATH`, from the pinned `prototype-2026w36` release tarball ([`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix)); `nix build .#cardano-cli` gets just the CLI. Bump the week there when the network rolls.
+**The repository's dev shell now provides it.** `nix develop` at the repo root puts `cardano-cli`, `cardano-node`, `tx-firehose`, and `mempool-monitor` on `PATH`, from the pinned `prototype-2026w38a` release tarball ([`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix)); `nix build .#cardano-cli` gets just the CLI. Bump the week there when the network rolls.
 
 Two alternatives: the image's `cardano-cli` is statically linked, so `podman cp musashi-bp-node:/usr/local/bin/cardano-cli .` is the quick way to get one; or build from upstream's flake, at the release tag whose `flake.lock` pins the same `cardano-node` rev the image reports:
 
 ```shell
-nix build github:input-output-hk/ouroboros-leios/prototype-2026w36#cardano-cli-static
-./result/bin/cardano-cli --version
+nix build github:input-output-hk/ouroboros-leios/prototype-2026w38a#cardano-cli-static
+./result/bin/cardano-cli --version     # verify the rev against the release in force
 ```
 
 `cardano-cli-static` is **x86_64-linux only**; on aarch64 Linux or Apple silicon build `#cardano-node-release`, a tarball with `cardano-node`, `cardano-cli`, `tx-firehose`, and `mempool-monitor`. Either needs the IOG binary cache — `https://cache.iog.io`, key `hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=` — which the flake declares in its own `nixConfig` but Nix honors only for a **trusted** user; otherwise pass `--extra-substituters` / `--extra-trusted-public-keys` yourself, or it will start building GHC. The flake also needs `allow-import-from-derivation`.
@@ -121,18 +122,18 @@ nix build github:input-output-hk/ouroboros-leios/prototype-2026w36#cardano-cli-s
 
 | Task | Command |
 |---|---|
-| Stop, keep the data | `podman pod stop musashi-bp` |
-| Start again | `podman pod start musashi-bp` |
-| Stop and remove the pod | `podman kube down musashi-bp.yaml` |
-| Recreate after editing the YAML | `podman kube play --replace musashi-bp.yaml` |
-| Shell in | `podman exec -it musashi-bp-node bash` |
-| Reset the chain state | `podman kube down musashi-bp.yaml && rm -rf /data/musashi` |
+| Stop, keep the data | `podman pod stop musashi-relay` |
+| Start again | `podman pod start musashi-relay` |
+| Stop and remove the pod | `podman kube down musashi-relay.yaml` |
+| Recreate after editing the YAML | `podman kube play --replace musashi-relay.yaml` |
+| Shell in | `podman exec -it musashi-relay-node bash` |
+| Reset the chain state | Stop the relay, verify `/data/musashi` is the intended chain directory, then remove it before replaying the new chain. |
 
 ## Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
-| Node exits complaining about the node version | The image is older than the live config's `MinNodeVersion` (currently `11.1.0.164-prototype-2026w36`). Move to that week's image — tag *and* digest together. Newer is not safer: see the churn row below. |
+| Node exits complaining about the node version | The image is older than the live config's `MinNodeVersion` (`11.1.0.164-prototype-2026w38a` when checked 2026-09-30). Move to the week currently named there — tag and digest together. An arbitrarily newer build is not safer: see the churn row below. |
 | Syncs nothing, or peers disconnect immediately | Almost certainly the stale baked config — check `config/PINNED.txt` exists and its `systemStart` matches the live network. Re-run `./pin-config.sh`, then `podman kube down` and `play` again. |
 | Config edits have no effect | The startup command re-copies `/app/config` over `/data` on **every** start. Edit `./config/`, not the copied files under `/data/musashi`. |
 | `curl localhost:12798/metrics` refused | The Prometheus rebind didn't happen (`EXPOSE_METRICS=0`, or a hand-edited config). Re-pin, then restart. |
@@ -145,9 +146,9 @@ nix build github:input-output-hk/ouroboros-leios/prototype-2026w36#cardano-cli-s
 
 ```shell
 ./pin-config.sh
-podman kube down musashi-bp.yaml
+podman kube down musashi-relay.yaml
 # If systemStart changed, remove the dead chain state now: rm -rf /data/musashi
-podman kube play musashi-bp.yaml
+podman kube play musashi-relay.yaml
 ```
 
 Config is read only at start, so a re-pin needs a restart. **If `systemStart` changed, the chain is a new instance and the old database is worthless** — remove `/data/musashi` after stopping the pod and before restarting. Diff `config/PINNED.txt` against the previous pin to see what moved; the hashes there are of the published bytes, so they compare directly with the ones recorded in [the parameter note](../artifacts/leios-node-protocol-parameters.md#sources).
@@ -170,14 +171,14 @@ A respin is more than a re-pin for a *producer*: the registration, stake, and KE
 3. **A committee seat, which stake alone doesn't guarantee.** Seating is the top `N_c = 900` pools by stake; a seated pool with no registered BLS key is *keyless* — it occupies a seat and cannot vote, and any certificate bit set on it invalidates the certificate. Details in [the parameter note § 3](../artifacts/leios-node-protocol-parameters.md).
 4. **A different container command.** `/app/run-node.sh` takes no key flags, so a producer must override `command:` and mount a `./keys` volume — [`musashi-bp.yaml`](./musashi-bp.yaml) is that pod, ready to play.
 
-Musashi stake is self-service: after the pool registration is on chain, submit its bech32 pool identifier through the faucet's **delegate** widget. This deployment completed that delegation in epoch 62 and is waiting for its epoch-64 activation snapshot.
+Musashi stake is self-service: after a pool registration is on chain, submit its bech32 pool identifier through the faucet's **delegate** widget. This deployment completed that sequence in epoch 62, became active in epoch 64, and retired in epoch 84. A future reactivation needs a new registration and delegation followed by the normal activation delay.
 
 ## Sources
 
 - Upstream's user-facing testnet documentation, which is the canonical operator path and worth reading alongside this: [install and run a node](https://leios.cardano-scaling.org/docs/testnet/getting-started/), [register a stake pool](https://leios.cardano-scaling.org/docs/testnet/register-stake-pool/), [SPO Rewards Program](https://leios.cardano-scaling.org/docs/testnet/rewards-program/), the [faucet](https://faucet.leios.play.dev.cardano.org/basic-faucet), and the [Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn). Their Docker section calls the config mount "optional — drop it to fall back to the in-image snapshot"; **do not**, for the reason in Step 1.
 
-- [MusashiNet prototype — Cardano Operations Book](https://book.play.dev.cardano.org/adv-musashi.html), and the configuration it publishes at [`environments-pre/leios`](https://book.play.dev.cardano.org/environments-pre/leios/config.json) (fetched 2026-09-21; `config.json` SHA-256 `a5caf918…`, unchanged since our 2026-09-17 read).
+- [MusashiNet prototype — Cardano Operations Book](https://book.play.dev.cardano.org/adv-musashi.html), and the configuration it publishes at [`environments-pre/leios`](https://book.play.dev.cardano.org/environments-pre/leios/config.json). Rechecked 2026-09-30: `systemStart` and genesis files remain unchanged, while `config.json` advanced to w38a and SHA-256 `3966e3d8d224fcf29ddc60ebd3fc4472b57bf010e16f44933651a7c60b54e126`.
 - [`ouroboros-leios/testnet/README.md`](https://github.com/input-output-hk/ouroboros-leios/blob/9fa5a956db7a7860065b68e221c6f7ce647242d5/testnet/README.md) and [`Dockerfile`](https://github.com/input-output-hk/ouroboros-leios/blob/9fa5a956db7a7860065b68e221c6f7ce647242d5/testnet/Dockerfile) @ `9fa5a95` (2026-09-21) — upstream's own relay setup, which this folder follows for the image and diverges from on config pinning.
-- Image metadata read from the GHCR registry API, 2026-09-21. In use: tag `prototype-2026w36`, digest `sha256:0df972de2193f9299af4df409fde2b7ea56188ddfe2c3b77aa661e23b226a566`, created 2026-09-07T10:45:59Z, node rev `afa091b4` (verified by extracting and running the binary). Also available: `prototype-2026w38`, digest `sha256:f515269771b923e2fc66c04c77df6e0b6779e1ccf8b1a5285c23d837c2ea7384`, created 2026-09-20T22:45:23Z, node rev `648fc48b` — newer than the running network, see the version-skew row in Troubleshooting.
+- Current release evidence checked 2026-09-30: the published configuration names `11.1.0.164-prototype-2026w38a`; the GHCR registry reports multi-architecture manifest digest `sha256:e9e501692d08f88ba372557a59d0c8189cb29f0416fea4e987dff046cad16227`; the release tag pins cardano-node revision `8c44d14542f41e96b657d013c6e183bcee9dfd85`. The historical producer capture used w36 at digest `sha256:0df972de2193f9299af4df409fde2b7ea56188ddfe2c3b77aa661e23b226a566`, revision `afa091b4`.
 - CLI flags: [`cardano-node@leios-prototype` `Parsers.hs`](https://github.com/IntersectMBO/cardano-node/blob/7e33674108ed17eeeda3a25e98b66a610cbd99ff/cardano-node/src/Cardano/Node/Parsers.hs#L375-L424) @ `7e33674`. Ledger types: [`cardano-ledger` `StakePool.hs`](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/libs/cardano-ledger-core/src/Cardano/Ledger/State/StakePool.hs#L460-L536) @ `1587f21`.
 - `podman kube play` field support and volume semantics: the podman 5.4.1 manual page.

@@ -1,8 +1,11 @@
 # Turning the relay into a single-node block producer
 
-**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation · **Verified:** 2026-09-22
+**Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** deployed network (musashi) + implementation · **Verified:** 2026-09-30
 
 Deliberately **one node that both relays and produces** — no relay/producer split. That is not how a mainnet pool is run, and § 8 says what you are giving up; on a testnet whose point is observation it is a reasonable trade.
+
+> [!IMPORTANT]
+> **Current state: retired and stopped.** Pool **ΘΕΛΩ** (`THELO`, `pool13pssq9ar0n7t7jt3y7cmusl06ufhd02j7wacwuanmnursyyr7qu`) retired in epoch 84, beginning 2026-09-28 00:00 UTC, and the producer shut down cleanly at 00:24:44 UTC. The public chain index confirms the exact retirement transaction and zero stake and delegators from epoch 85. Leave the producer stopped unless intentionally following the reactivation procedure under [Retire the pool](#retire-the-pool); starting [`musashi-bp.yaml`](./musashi-bp.yaml) alone does not reactivate a retired pool.
 
 > [!IMPORTANT]
 > **Read upstream's guide alongside this one.** The Leios project publishes a full stake pool operator (SPO) path — [install and run a node](https://leios.cardano-scaling.org/docs/testnet/getting-started/), [register a stake pool](https://leios.cardano-scaling.org/docs/testnet/register-stake-pool/), and the [SPO Rewards Program](https://leios.cardano-scaling.org/docs/testnet/rewards-program/). That is the canonical procedure and it is self-service; this document adds the single-node shape, the pod spec, and the numbers read from the network's own genesis. Questions go to the **[Musashi Dōjō Discord](https://discord.gg/AyUXD9VHn)**.
@@ -11,7 +14,7 @@ Deliberately **one node that both relays and produces** — no relay/producer sp
 >
 > **The SPO Rewards Program does not apply to this pool.** It exists — an application form, an Application Code carried in the registration transaction's metadata, rewards paid to a mainnet address — but it is aimed at external operators, and an IOG-run pool claiming it would not be appropriate. So no metadata is needed in the registration transaction, and the scripts here do not add any. Worth knowing for a different reason: the program's stated rationale is that the chain records outcomes while *timing* lives in the nodes, which is the same case [the instrumentation note](../artifacts/leios-tx-flow-instrumentation.md) makes for collecting logs.
 
-Everything here uses the **w36** command-line interface (CLI) whose `dijkstra` command group carries the Leios additions. `nix develop` at the repository root provides it (plus `cardano-node`, `tx-firehose`, and `mempool-monitor`) from [`nix/cardano-node-leios.nix`](../nix/cardano-node-leios.nix); `podman cp musashi-bp-node:/usr/local/bin/cardano-cli .` is the fallback.
+The procedure was exercised with the **w36** command-line interface (CLI), whose `dijkstra` command group carries the Leios additions. The live configuration advanced to **w38a** by 2026-09-30, so `nix develop` at the repository root and both retained pod specifications now provide w38a. Re-pin and recheck the required week before any later use; `podman cp <running-container>:/usr/local/bin/cardano-cli .` is the fallback.
 
 ```shell
 export CARDANO_NODE_SOCKET_PATH=/data/musashi/node.socket
@@ -34,10 +37,10 @@ The checked-in pod specifications mount the host directory `/data/musashi` at `/
 > **Settled 2026-09-22 from the pfSense rule** ("musashi at darter", WAN address TCP 3010 → 192.168.1.12:3010): the producer runs on **darter** at 192.168.1.12, and `thelio.functionally.dev` is the *WAN's* name, not the host's. The relay record therefore names the public name correctly, and `darter.functionally.dev` not resolving is expected.
 
 > [!NOTE]
-> **Registered on chain 2026-09-22, epoch 62.** `query pool-state` confirms pool `88610017a37cfcbf497127b1be43efd71376bd52f3bb8773b3dcf838` (`pool13pssq9ar0n7t7jt3y7cmusl06ufhd02j7wacwuanmnursyyr7qu`) with the relay `thelio.functionally.dev:3010`, the metadata hash and Pinata URL, cost 170000000, margin 0, pledge 0, deposit 500000000, one delegator (its own stake key), and **`spsBlsKey` present** — a 96-byte Boneh–Lynn–Shacham (BLS) `blsPubKey` and 48-byte `blsPossessionProof`, `bksRegisteredIn: 62`, so the Leios voting key is honored until epoch **436** (2026-12-25). The op-cert covers Key Evolving Signature (KES) periods **10–71** and expires at the start of period **72**, 2026-12-24 — the two ≈93-day clocks of § 6, landing within a day of each other as expected.
+> **Historical registration state.** The pool registered on chain in epoch 62 on 2026-09-22 with relay `thelio.functionally.dev:3010`, cost 170000000, margin 0, pledge 0, deposit 500000000, and a Boneh–Lynn–Shacham (BLS) voting key. Its original key-age and Key Evolving Signature (KES) expiry dates no longer govern current eligibility because the pool retired in epoch 84. They remain useful only when interpreting the historical run: the BLS key registered in epoch 62 would otherwise have been honored through epoch 435, and the operational certificate covered KES periods 10–71.
 
 > [!NOTE]
-> **Current activation state, 2026-09-22:** the faucet delegation was submitted in epoch 62 and the block-producing pod is deployed. Its delegated stake becomes active at the start of epoch **64**, 2026-09-23 00:00 UTC. Epoch 64 makes the pool eligible for Praos leadership and seats it in the Leios committee if it remains among the top 900 pools; it does not guarantee selection to produce a block.
+> **Retirement state, verified 2026-09-30:** the public Musashi chain index records retirement transaction `27454fa267ecc3600a1eb13743c19051bbf443f70d9fbeffd062c5d55c167444` in epoch 82 and the effective retirement in epoch 84. It reports 1,026,605,270,496 lovelace and two delegators in epoch 84, then zero stake and zero delegators in epoch 85. See the append-only [operational analysis](./observations.md#public-chain-index-confirms-retirement) for evidence and limitations.
 
 ## 1. Two host prerequisites
 

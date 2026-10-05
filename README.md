@@ -36,7 +36,7 @@ Research-and-development exploration of [Ouroboros Leios](https://github.com/inp
 - `AGENTS.md` — the charter: mission, goals, constraints, repository blueprint, conventions, and analysis instructions. Read before contributing.
 - `CLAUDE.md` — Claude-specific addenda; defers to `AGENTS.md`.
 - `artifacts/` — synthesis documents, source maps, and diagrams (the table above).
-- `musashi/` — the live node on the musashi testnet: two `podman kube` pod specs (relay and block producer), a config-pinning script, credential and registration scripts, the pool's published metadata, and two guides. Since 2026-09-22 this runs a registered block producer, pool **ΘΕΛΩ** (`THELO`). Its `config/`, `data/`, and `keys/` are gitignored. The Tidbyt status display that watches it was built here and now lives at [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi).
+- `musashi/` — the Musashi testnet node environment: two `podman kube` pod specs (relay and block producer), config-pinning, registration and retirement scripts, the pool's published metadata, and two guides. Pool **ΘΕΛΩ** (`THELO`) operated from epochs 64 through 84 and is now retired; no node is intentionally running. The environment is retained for analysis and possible later reactivation. Its `config/`, `data/`, and plaintext `keys/` are gitignored. The Tidbyt status display developed here now lives at [`functionally/tidbyt-musashi`](https://github.com/functionally/tidbyt-musashi).
 - `journal/` — dated work log, newest first. A historical record: existing text is not edited.
 - `facts.md` — verified findings, each with its date, source, and layer.
 - `meta-lessons-learned.md` — append-only log of methodology and process lessons.

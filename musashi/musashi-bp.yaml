@@ -17,9 +17,10 @@ spec:
   restartPolicy: always
   containers:
     - name: node
-      # KEEP THIS DIGEST IN STEP WITH musashi-relay.yaml. w36 is the build the
-      # running chain was deployed from; see cheatsheet.md on version skew.
-      image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w36@sha256:0df972de2193f9299af4df409fde2b7ea56188ddfe2c3b77aa661e23b226a566
+      # KEEP THIS DIGEST IN STEP WITH musashi-relay.yaml. The producer is
+      # retired; this is the build required by the live config on 2026-09-30,
+      # ready only for a deliberate reactivation after the runbook checks.
+      image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w38a@sha256:e9e501692d08f88ba372557a59d0c8189cb29f0416fea4e987dff046cad16227
       # /app/run-node.sh takes no key flags, so the producer replaces it. This
       # repeats what that script does — stage the pinned config into /data and
       # run there, since config.json names its genesis files relatively — and

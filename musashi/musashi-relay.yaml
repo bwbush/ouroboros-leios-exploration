@@ -21,18 +21,12 @@ spec:
     - name: node
       # Weekly release tag, digest-pinned so a re-tag cannot change what runs.
       #
-      # MATCH THE WEEK TO THE NETWORK, NOT TO MAIN. The live config names
-      # MinNodeVersion 11.1.0.164-prototype-2026w36 and the chain that has
-      # been running since 2026-09-07 was deployed from the w36 build
-      # (node rev afa091b4, image built 2026-09-07). MinNodeVersion is only a
-      # floor, so a newer image starts happily and then diverges: w38 carries
-      # a newer cardano-ledger (daa38fec vs 1587f21a) and rejects a block the
-      # network accepted, as a phase-2 (Plutus) validation mismatch. See
-      # cheatsheet.md, "the node stops advancing and churns peers".
-      #
-      # w38, for when the network rolls forward:
-      #   prototype-2026w38@sha256:f515269771b923e2fc66c04c77df6e0b6779e1ccf8b1a5285c23d837c2ea7384
-      image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w36@sha256:0df972de2193f9299af4df409fde2b7ea56188ddfe2c3b77aa661e23b226a566
+      # MATCH THE WEEK TO THE NETWORK, NOT TO MAIN. The live config named
+      # MinNodeVersion 11.1.0.164-prototype-2026w38a on 2026-09-30. The chain
+      # retains its 2026-09-07 genesis, but its required weekly build advanced
+      # from w36 after this environment's historical producer run. A mismatched
+      # prototype can start and later diverge; see cheatsheet.md.
+      image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-testnet:prototype-2026w38a@sha256:e9e501692d08f88ba372557a59d0c8189cb29f0416fea4e987dff046cad16227
       # The image's CMD is /app/run-node.sh: it copies /app/config into /data,
       # then runs `cardano-node run` there. Everything below only adjusts the
       # environment that script reads.

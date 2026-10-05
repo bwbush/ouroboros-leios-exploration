@@ -2,6 +2,9 @@
 
 **Provenance:** ⏳🤖 LLM-generated, pending human review · **Layer:** implementation and release artifacts · **Verified:** 2026-09-21
 
+> [!WARNING]
+> **Deployment update, 2026-09-30:** no local Musashi node is currently running; pool THELO is retired. The live configuration now names `prototype-2026w38a`, and the retained pod specifications and development shell have moved to that release. The binary comparisons below remain a dated w36-versus-w38 audit and should not be read as current deployment status.
+
 > [!NOTE]
 > **How this was verified.** The relay image's two binaries were pulled out of
 > the published layers and **run directly** — every command list, flag, and
@@ -22,16 +25,14 @@ revs:
 
 | Image tag | `cardano-node` | `cardano-cli` | Git rev | Built |
 |---|---|---|---|---|
-| **`prototype-2026w36`** — what musashi runs | `11.1.0.164` | `11.2.2.0` | `afa091b4` | 2026-09-07 |
+| **`prototype-2026w36`** — historical producer build | `11.1.0.164` | `11.2.2.0` | `afa091b4` | 2026-09-07 |
 | `prototype-2026w38` — branch head | `11.1.0.164` | `11.2.2.0` | `648fc48b` | 2026-09-20 |
 
 **The version strings are identical and the revs are not**, which is the whole
 trap: `11.1.0.164` tells you nothing about which week's ledger rules a binary
 carries. w38 is the head of `cardano-node`'s `leios-prototype` branch and is
 five days ahead of the `7e33674` pin our source documents cite; w36 is the
-build the running chain was deployed from, and is what
-[`musashi/musashi-relay.yaml`](../musashi/musashi-relay.yaml) now pins after a
-w38 node stalled on a phase-2 validation disagreement (§ 2.7).
+build the chain was originally deployed from and the build used for this environment's historical producer run. The retained pod specifications subsequently moved to w38a after the published live configuration advanced; the w38 stall remains the evidence for matching the network's named release rather than choosing an arbitrary newer one (§ 2.7).
 
 Everything below was checked on **both** binaries. The `dijkstra node`,
 `dijkstra query`, and `dijkstra stake-pool` help output is byte-identical

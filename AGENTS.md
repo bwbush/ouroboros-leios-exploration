@@ -110,6 +110,8 @@ Directories are created on first use; in the scope-discovery phase most of this 
 
 ## 📝 Conventions
 
+**Working timezone.** Brian is currently using Mountain Daylight Time (MDT, UTC−06:00). Interpret conversational dates such as "today," "yesterday," and meeting dates in that timezone unless he specifies otherwise. Preserve the original timezone on source timestamps and telemetry; the container's UTC clock does not define Brian's local date. This preference was confirmed on 2026-10-02 and should be revisited when daylight saving time changes.
+
 **Spelling.** Use American English throughout this repository (e.g., "color" not "colour", "centralized" not "centralised", "behavior" not "behaviour", "finalized" not "finalised", "utilization" not "utilisation", "catalog" not "catalogue"). This applies to prose, comments, and identifiers introduced in this repo; preserve the spelling of identifiers from upstream code and of direct quotations as written.
 
 **Markdown line width.** Do not hard-wrap prose in Markdown documents to a fixed column limit. Write each paragraph or bullet as a single logical line and let editors and renderers soft-wrap it. Fixed-width hard wrapping makes edits and diffs noisier and reflows badly across viewers; reserve hard line breaks for actual paragraph, list-item, and block boundaries.

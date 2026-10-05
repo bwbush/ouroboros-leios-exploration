@@ -20,26 +20,26 @@
 #     printf '%-16s sha256-%s\n' "$s" "$(printf %s "$h" | xxd -r -p | base64)"
 #   done
 #
-# and update `version`, `rev`, and the three hashes together.
+# and update `version`, `rev`, and both Linux hashes together.
 {
   lib,
   stdenvNoCC,
   fetchurl,
 }:
 let
-  version = "prototype-2026w36";
+  version = "prototype-2026w38a";
   # The cardano-node commit both binaries report from `--version`; recorded so
   # a checkout can be matched to the binaries without downloading them.
-  rev = "afa091b4af2795d1d9c46e59145ed16127760f7b";
+  rev = "8c44d14542f41e96b657d013c6e183bcee9dfd85";
 
   # Hashes are upstream's own published .sha256 files, converted to SRI. The
-  # x86_64-linux tarball was additionally downloaded and checked against that
-  # checksum on 2026-09-22, and its binaries report rev afa091b4.
+  # w38a hashes and revision were refreshed from the upstream release assets
+  # and release tag on 2026-09-30; the install check verifies the binary rev.
   # Linux only: this effort does not support darwin. Upstream also publishes an
   # aarch64-darwin tarball if that ever changes.
   srcs = {
-    x86_64-linux = "sha256-twkC4sgnxhywVih6CIMI0WzxThXXookFogR4KfPxsH4=";
-    aarch64-linux = "sha256-w68ThNfhztsQcIcM+X9wj3BbYrGbeaJdfojqUPgrRBw=";
+    x86_64-linux = "sha256-ClgJrxxPboCIFF+I+8+yw+X453S3NsLr2wsRGbepf7w=";
+    aarch64-linux = "sha256-oMopyDQuCZcagMce6/GetkJJ75/bt4j+sZfwDNpbTug=";
   };
 
   inherit (stdenvNoCC.hostPlatform) system;

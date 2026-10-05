@@ -2,6 +2,14 @@
 
 Reverse-chronological log. Newest date sections first; newest entries first within a date. See [AGENTS.md](../AGENTS.md) § Repository Blueprint for the format rules.
 
+## 2026-09-30
+
+### Confirmed the Musashi pool retirement and archived the environment as stopped ⏳🤖
+
+The public chain index now closes the retirement uncertainty left by the final local log. It includes the exact prepared transaction in block 79,448 during epoch 82, marks pool THELO retired at epoch 84, and reports zero stake and zero delegators from epoch 85. This also empirically confirms the Dijkstra source reading: the preceding snapshot kept the pool active during retirement epoch 84, while the post-reaping snapshot removed it for epoch 85. The full evidence and the distinction between public index data and local node telemetry are in the [Musashi observations](../musashi/observations.md#public-chain-index-confirms-retirement).
+
+Updated the repository entry point and both Musashi guides to stop describing the block producer as currently running. The producer remains intentionally stopped; the pod specification, encrypted credentials, scripts, database, and logs are retained for analysis and a possible later reactivation. The cheatsheet now defaults any optional observer start to the credential-free relay pod, while the producer runbook requires re-registration, delegation, activation delay, configuration pinning, and key checks before reuse. A live configuration check also found that the unchanged September 7 chain now requires w38a rather than w36, so both pod manifests and the Nix binary package were advanced together using the published image digest, archive hashes, and release revision; the downloaded x86-64 binaries matched the checksums and reported the expected revision.
+
 ## 2026-09-24
 
 ### Narrowed the mempool scope to plausible ingress and attack bounds ⏳🤖
