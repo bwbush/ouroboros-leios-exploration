@@ -105,6 +105,14 @@
             ghostscript    # PDF manipulation and conversion
             imagemagick    # SVG → PNG conversion for slide-deck figures (see artifacts/phase-1-slides/figures/)
             jq             # JSON processing
+            # arc-leios-ha/baselining/: create and tear down repeatable EC2
+            # experiment fleets. Terraform's license is covered by the
+            # existing allowUnfree setting; AWS credentials stay outside Nix.
+            terraform
+            awscli2        # AWS SSO login, identity checks, and S3 log archival
+            ssm-session-manager-plugin # Interactive AWS Systems Manager sessions
+            openssh        # Remote node administration and SSH-based Nix deployment
+            rsync          # Transfer node configuration and collect diagnostic files
             # DuckDB — quick SQL over Parquet without a Python dep chain.
             # Used for spot-checking the walker's archives (both the
             # `walk`-produced and `process-instrumented`-produced ones)
