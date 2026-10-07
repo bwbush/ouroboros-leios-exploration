@@ -4,6 +4,10 @@ Reverse-chronological log. Newest date sections first; newest entries first with
 
 ## 2026-10-07
 
+### Reviewed the AWS baselining branch with a Sol sub-agent ⏳🤖
+
+At Brian's request, a GPT-6 Sol sub-agent performed a targeted review of the analytics acceptance path and broader deployment, archival, database, and dashboard work. No blocking defect was identified in the examined code/evidence. Corrected the peer-graph guide's stale statement that its now-committed PNG preview was untracked. 📊 **EVIDENCE:** 70 Python tests, dashboard JavaScript tests, six Terraform validations, 15 mocked Terraform tests, and ShellCheck passed. The [review record](../arc-leios-ha/baselining/review-issue-12.md) distinguishes Sol's source inspection from the main agent's checks, records a deferred bootstrap-hardening opportunity, and preserves the distinction between the completed transaction/first-analytics increment and four unreconciled baseline-evidence checkboxes. No serious disagreement arose; commits and merging remain Brian's responsibility.
+
 ### Exercised the analytics workflow and drew the observed peer graph ⏳🤖
 
 📊 **EVIDENCE:** the [end-to-end run](../arc-leios-ha/baselining/analytics/peer-graph-2026-10-07/README.md) converted archived logs on EC2-0, published versioned Parquet, queried the downloaded selection, and produced a [static peer diagram](../arc-leios-ha/baselining/analytics/peer-graph-2026-10-07/peer-connectivity.svg). The 21:50–22:00 UTC / 15:50–16:00 MDT sample contains 676 message observations across our three relays, involving 62 other IP addresses and 169 directed observed links. Six samples matched archived JSON; replay reused the published batch. The worker took 207.436 seconds and peaked at 116.3 MiB, producing 286,590 bytes of Parquet and a 45,522-byte edge table.
