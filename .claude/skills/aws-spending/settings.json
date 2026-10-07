@@ -1,0 +1,8 @@
+{
+  "profile": "arc-leios-ha",
+  "account": "381492303550",
+  "budget_start": "2026-10-05",
+  "budget_usd": "2000",
+  "check_in_usd": "1500",
+  "tags_file": "arc-leios-ha/baselining/terraform/required-tags.json"
+}
