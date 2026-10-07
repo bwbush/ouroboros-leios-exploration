@@ -2,6 +2,34 @@
 
 Reverse-chronological log. Newest date sections first; newest entries first within a date. See [AGENTS.md](../AGENTS.md) § Repository Blueprint for the format rules.
 
+## 2026-10-07
+
+### Deployed a private Musashi operations dashboard ⏳🤖
+
+Created the [private dashboard](https://symmetrical-adventure-qq5573e.pages.github.io/) for machine addresses and health, log-loss warnings, history-indexing progress, the operator-maintained experiment label, and separately reported versus estimated costs. Brian extended the GitHub login's workflow permission after the initial source-publication attempt was blocked. A harmless placeholder verified private access before operational data was published. Five-minute host publishers use existing archive permissions; the approximately ten-minute GitHub refresh uses short-lived Amazon Web Services credentials and has no infrastructure-control permissions. All three relay invocation IDs survived installation unchanged.
+
+📊 **EVIDENCE:** [the complete publication workflow](https://github.com/input-output-hk/arc-leios-ha/actions/runs/37676842591) passed, and an independently downloaded artifact contained fresh snapshots without collection errors. Anonymous access redirected to GitHub authentication; Brian or Will still needs to check signed-in rendering. The [deployment record](../arc-leios-ha/baselining/dashboard/README.md) preserves source/system identities, billing-coverage caveats, the pinned image's generated-manual build workaround, and update instructions. Dashboard-only commits were published to remote `main` without staging or committing the existing local baselining work.
+
+### Deployed history indexing on EC2-0 and drafted the analytics flow ⏳🤖
+
+Brian authorized co-locating PostgreSQL and Leios db-sync on the first US Amazon Elastic Compute Cloud instance, now called EC2-0, while accepting interference with the relay. Added a separately encrypted/tagged 100 GiB data volume, built the pinned db-sync remotely, and started history replay at 15:33:28 UTC. Both operator roles have read access without database write privileges; the original relay invocation was preserved. Initial migrations, advancing history, and Leios certificate/committee indexing passed, while full catch-up remains unverified. Resource monitoring now includes the two database services and data volume; diagnostics and telemetry continue into the existing archive. The [deployment report](../arc-leios-ha/baselining/aws-dbsync/deployment-2026-10-07.md) and [lessons](../arc-leios-ha/baselining/aws-dbsync/lessons-learned.md) record startup corrections, two build-window forwarding overflows totaling 32,768 objects, and the absence of a scheduled database backup.
+
+Prepared a [discussion design](../arc-leios-ha/baselining/analytics-dataflow.md) for verified raw logs, batch Parquet conversion, Simple Storage Service datasets, and DuckDB analysis joined to reproducible chain extracts. The draft keeps source provenance, logging/coverage changes, repeated transaction hashes, and rollback-sensitive chain interpretation explicit. It does not deploy the analytics pipeline or a new analytics machine. Also added the [AWS spending skill](../.claude/skills/aws-spending/SKILL.md), whose live test identified a billing-tag attribution discrepancy; reported tagged costs remain lagging and incomplete, not a validated remaining balance.
+
+### Deployed Frankfurt and Tokyo Musashi relays ⏳🤖
+
+With Brian's explicit authorization, deployed two additional Amazon Elastic Compute Cloud relays using four physical cores, 8 GiB RAM, 8 GiB swap, and 100 GiB disks. A cleanly stopped copy of the existing w40 US database bootstrapped both; the US node was stopped for 172 seconds and then resumed. Both new relays reached a reported 100.00% synchronized tip, with operator socket access, selected logging, archival, and CPU/memory/disk monitoring checked. Required organizational tags were verified on the provisioned resources. See the [execution record](../arc-leios-ha/baselining/runtime/regional-relays-2026-10-07.md) and [operator cheatsheet](../arc-leios-ha/baselining/cheatsheet.md).
+
+Recorded and corrected export-service environment, provenance-directory ownership, and transient-hostname problems. Bootstrap work included five US forwarding overflows totaling 81,920 objects and one Tokyo startup overflow of 16,384; those intervals are not a complete baseline capture. The generated local snapshot copies were removed after verification, with the recoverable versioned archive retained in the shared bucket. This remains informal preparation: no workload injection or AWS database-synchronization server was deployed. Brian and Will's USD 2,000 shared budget and USD 1,500 check-in threshold still apply.
+
+### Agreed today's informal preparation and logging selection ⏳🤖
+
+Brian reported today's agreement with Will: Will will develop transaction injection, either by modifying the existing centrifuge or building a generator based on a domain-specific language. Brian and Codex will refine the existing Amazon Web Services deployment: adjust logging, add a relay in Europe and another in Asia, set up a minimalist database-synchronization server, and organize the analytical data flow. Work this week remains informal; the first formal experiment is planned for next week, with its design and exact start still to be settled. The regional relays and database server are next work items, not resources launched by this entry.
+
+Brian selected the [logging assessment](../arc-leios-ha/baselining/logging.md)'s Collect items plus only peer-attributed vote messages and database insertion collisions from Gray; Omit and the remaining routine Gray records are to be disabled in the node configuration, not filtered after forwarding. The policy applies to the existing relay and subsequent deployments until revised. Independent loss monitoring and host resource profiling remain enabled. This instruction supersedes the earlier suggestion to keep all Gray categories, including periodic full peer-state snapshots.
+
+---
+
 ## 2026-10-05
 
 ### Recorded Brian and Will's Musashi Dojo experiment direction ⏳🤖
