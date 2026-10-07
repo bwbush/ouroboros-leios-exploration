@@ -10,11 +10,18 @@ Issue Type, parent (sub-issue relationship), assignee, ProjectV2 board Status,
 Target date, Start date. Works against any repo + ProjectV2 pair; the target for
 this effort is not yet fixed (see Board target below).
 
-## Board target (must be confirmed before first use)
+## Board target
 
-**This effort has no tracking board yet.** This repository has no configured git
-remote as of 2026-09-16, so there is nothing for the script to auto-detect.
-Confirm the target with the user and record it here before filing anything.
+**Confirmed shared-work target (2026-10-07):** use repository
+`input-output-hk/arc-leios-ha` and project **#167, Leios roadmap & activity**,
+as established in the agreed experiment plan and existing AWS baselining task.
+Pass `--repo` and `--project` explicitly. Confirm a different target when a
+request concerns another repository. The historical candidate inventory below
+is not a substitute for querying the target's current fields.
+
+Project #167 currently offers `Todo`, `In Progress`, and `Done`; pass the
+intended status explicitly because the script's generic `Ready` default is
+not an option on this board. For unassigned follow-up Tasks, pass `--assignee ''`.
 
 Candidate boards under org `input-output-hk`, for reference:
 
