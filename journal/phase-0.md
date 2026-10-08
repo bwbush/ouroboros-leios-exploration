@@ -4,6 +4,10 @@ Reverse-chronological log. Newest date sections first; newest entries first with
 
 ## 2026-10-08
 
+### Migrated operational Terraform states to shared storage ⏳🤖
+
+With Brian's confirmation that Will was not using Terraform, created a separate private, encrypted, versioned S3 state bucket and migrated all six existing infrastructure roots plus the backend's own bootstrap state. 📊 **EVIDENCE:** all resource records and outputs matched protected backups; seven refreshed plans showed no changes; seven validations and sixteen mocked tests passed. Concurrent plans demonstrated lock exclusion and successful reuse after release. The [migration record](../arc-leios-ha/baselining/terraform/state-backend/migration-2026-10-08.md) maps changed lineage identifiers and documents recovery; the [operator runbook](../arc-leios-ha/baselining/terraform/state-backend/README.md) covers existing checkouts and stale local files. No node or database was restarted. Will's independent credential/plan test remains outstanding for arc-leios-ha#14; no commits or ticket-field changes were made.
+
 ### Increased the European relay's forwarding queue ⏳🤖
 
 At Brian's request, increased only the EU relay from 16,384 to 262,144 log objects and retained the collector's 1,024-object batch size. 📊 **EVIDENCE:** remote configuration checks, a single-field JSON comparison, startup reflection, and independent archived-provenance read-back confirmed the change. The node restarted cleanly at 06:49:50 MDT and reported 100.00% synchronization; tracer and monitoring invocations were preserved. No new overflow was observed during the short initial check, not sufficient to establish improvement. The [trial record](../arc-leios-ha/baselining/runtime/eu-forwarder-queue-2026-10-08.md) contains hashes, monitoring caveats, and rollback instructions. US and Asia remain unchanged. Will restored SSH access using his own AWS CLI allowlist updater; no Tailscale deployment is needed. Brian accepted the dashboard's current refresh behavior and requested no dashboard changes.
