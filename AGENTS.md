@@ -100,7 +100,7 @@ Directories are created on first use; in the scope-discovery phase most of this 
   5. **Robustness of primary conclusions** — assess whether the main conclusions survive the uncertainties identified above.
 
 - `/background/`: **[PRIVATE/PROPRIETARY]** Centralized storage for reference materials, papers, internal roadmaps, and sensitive communications. Nothing in this directory is quoted verbatim into an outward-facing document without checking its distribution status first.
-- `/experiments/`: Code spikes, simulation harnesses, trace-analysis scripts, and troubleshooting reproductions. Each experiment subdirectory must contain two append-only files:
+- `/arc-leios-ha/experiments/`: Shared code spikes, simulation harnesses, trace-analysis scripts, troubleshooting reproductions, and their records. Shared work belongs here so collaborators can use the shared repository without this parent checkout. The parent's `/experiments/` is reserved for personal or private explorations, if needed. Each experiment subdirectory must contain two append-only files:
   - `design-history.md` — records design decisions and their rationale as the experiment evolves.
   - `lessons-learned.md` — records findings, surprises, and actionable conclusions.
 
@@ -164,6 +164,10 @@ The provenance marker on an assessment document is propagated to its journal sum
 
 The authored `arc-leios-ha` work repository is not subject to this vendored-code restriction. Changes belong directly in that repository; committing them and advancing the parent gitlink remain separate Git operations and require the usual user direction.
 
+**Transaction-formatter exception, authorized 2026-10-08.** For [transaction-formatter](transaction-formatter/) only, Brian explicitly authorized direct, logically scoped commits and amendments while developing an upstream contribution. This submodule is a checkout of `IntersectMBO/cardano-node`, initially pinned to the deployed w40 revision `8206f9f843d46f9fa9a58449ed2387e2c0aa1a84`; it is not a standalone formatter package. Preserve the reviewable branch history rather than maintaining duplicate patches. This authorization does not permit commits in the parent or `arc-leios-ha`, nor creation of pull requests. Local commits must be published to an agreed fork before another checkout can resolve a parent gitlink pointing to them.
+
+Brian subsequently authorized the [personal fork](https://github.com/bwbush/cardano-node) and publication of `configurable-transaction-logging` on the same date. The submodule URL and local `origin` use that fork; `upstream` remains `IntersectMBO/cardano-node`. Parent/shared commits and pull requests still require separate direction.
+
 ## ⏳ Timeline
 
 The initial shared experiment direction was agreed on **2026-10-05 (Mountain Daylight Time)**. Work proceeds incrementally through experiment ideas and selected tickets rather than a predefined multi-month epic. No run dates or fixed completion date have been committed.
@@ -174,7 +178,7 @@ When working in this repository, LLM assistants should:
 
 1. **Assume a Senior Systems Architect and Distributed-Systems Researcher role.** Prioritize correctness, safety, and liveness, and apply the "No Free Lunch" principle across throughput, latency, storage, and fault-tolerance trade-offs. Leios buys throughput with structure; the interesting question is always what it pays.
 2. **Be explicit about the layer under discussion.** Paper, formal specification, simulator, node implementation, and deployed network are five different objects. Name which one a claim is about, every time.
-3. **Maintain traceability.** Link each 🧪 **HYPOTHESIS** in the journal to the code in `/experiments/` that tests it and to the resulting 📊 **EVIDENCE**.
+3. **Maintain traceability.** Link each 🧪 **HYPOTHESIS** in the journal to the code in `/arc-leios-ha/experiments/` (or the parent's `/experiments/` for private explorations) that tests it and to the resulting 📊 **EVIDENCE**.
 4. **Be formal-methods aware.** Flag claims about safety and liveness that would benefit from mechanized verification, and note where Agda, TLA+, Isabelle, or Coq treatments already exist upstream or in the literature.
 5. **Troubleshoot by bisection, not by narrative.** When explaining an anomaly, isolate it — smaller parameter set, fewer nodes, fixed seed, one changed variable — before proposing a mechanism. Record the reduction, not just the conclusion.
 6. **Prefer "unknown" to a confident guess.** In a scope-discovery phase, a well-posed open question is a deliverable. Say what would settle it.
