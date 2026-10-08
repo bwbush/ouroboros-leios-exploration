@@ -2,6 +2,14 @@
 
 Reverse-chronological log. Newest date sections first; newest entries first within a date. See [AGENTS.md](../AGENTS.md) § Repository Blueprint for the format rules.
 
+## 2026-10-08
+
+### Increased the European relay's forwarding queue ⏳🤖
+
+At Brian's request, increased only the EU relay from 16,384 to 262,144 log objects and retained the collector's 1,024-object batch size. 📊 **EVIDENCE:** remote configuration checks, a single-field JSON comparison, startup reflection, and independent archived-provenance read-back confirmed the change. The node restarted cleanly at 06:49:50 MDT and reported 100.00% synchronization; tracer and monitoring invocations were preserved. No new overflow was observed during the short initial check, not sufficient to establish improvement. The [trial record](../arc-leios-ha/baselining/runtime/eu-forwarder-queue-2026-10-08.md) contains hashes, monitoring caveats, and rollback instructions. US and Asia remain unchanged. Will restored SSH access using his own AWS CLI allowlist updater; no Tailscale deployment is needed. Brian accepted the dashboard's current refresh behavior and requested no dashboard changes.
+
+---
+
 ## 2026-10-07
 
 ### Reviewed the AWS baselining branch with a Sol sub-agent ⏳🤖
